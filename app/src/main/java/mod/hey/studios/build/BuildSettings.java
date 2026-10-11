@@ -27,6 +27,14 @@ public class BuildSettings extends ProjectSettings implements Serializable {
     public static final String SETTING_JAVA_VERSION_14 = "14";
     public static final String SETTING_JAVA_VERSION_15 = "15";
     public static final String SETTING_JAVA_VERSION_16 = "16";
+    public static final String SETTING_JAVA_VERSION_17 = "17";
+
+    /**
+     * Defaults used by BOTH the Build Settings UI and the build itself, so what the UI shows
+     * is always what actually gets used when nothing has been saved yet.
+     */
+    public static final String DEFAULT_DEXER = SETTING_DEXER_D8;
+    public static final String DEFAULT_JAVA_VERSION = SETTING_JAVA_VERSION_17;
 
     public BuildSettings(String sc_id) {
         super(sc_id);
