@@ -210,7 +210,7 @@ public class ProjectBuilder {
     public boolean isD8Enabled() {
         return build_settings.getValue(
                 BuildSettings.SETTING_DEXER,
-                BuildSettings.SETTING_DEXER_DX
+                BuildSettings.DEFAULT_DEXER
         ).equals(BuildSettings.SETTING_DEXER_D8);
     }
 
@@ -292,7 +292,7 @@ public class ProjectBuilder {
          * Since all versions above java 7 supports lambdas, this should work
          */
         if (!build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION,
-                        BuildSettings.SETTING_JAVA_VERSION_1_7)
+                        BuildSettings.DEFAULT_JAVA_VERSION)
                 .equals(BuildSettings.SETTING_JAVA_VERSION_1_7)) {
             classpath.append(":").append(new File(BuiltInLibraries.EXTRACTED_COMPILE_ASSETS_PATH, "core-lambda-stubs.jar").getAbsolutePath());
         }
@@ -542,7 +542,7 @@ public class ProjectBuilder {
 
             ArrayList<String> args = new ArrayList<>();
             args.add("-" + build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION,
-                    BuildSettings.SETTING_JAVA_VERSION_1_7));
+                    BuildSettings.DEFAULT_JAVA_VERSION));
             args.add("-nowarn");
             if (!build_settings.getValue(BuildSettings.SETTING_NO_WARNINGS,
                     BuildSettings.SETTING_GENERIC_VALUE_TRUE).equals(BuildSettings.SETTING_GENERIC_VALUE_TRUE)) {
