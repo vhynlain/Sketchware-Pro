@@ -1,6 +1,7 @@
 package mod.pranav.dependency.resolver
 
 import android.os.Environment
+import com.android.tools.r8.CompilationFailedException
 import com.android.tools.r8.CompilationMode
 import com.android.tools.r8.D8
 import com.android.tools.r8.D8Command
@@ -383,8 +384,27 @@ class DependencyResolver(
 
     private fun compileJar(jarFile: Path, jars: List<Path>, libraryJars: List<Path>) {
         Files.createDirectories(jarFile.parent)
+        try {
+            runD8(jarFile, jars, libraryJars, intermediate = true)
+        } catch (e: CompilationFailedException) {
+            // Libraries containing e.g. Java records need "global synthetics" (Record desugaring),
+            // which D8 refuses to create in intermediate mode. Only those libraries are retried
+            // in non-intermediate mode, every other library keeps the previous behavior.
+            val needsGlobalSynthetics = generateSequence<Throwable>(e) { it.cause }
+                .any { it.message?.contains("global synthetic", ignoreCase = true) == true }
+            if (!needsGlobalSynthetics) throw e
+            runD8(jarFile, jars, libraryJars, intermediate = false)
+        }
+    }
+
+    private fun runD8(
+        jarFile: Path,
+        jars: List<Path>,
+        libraryJars: List<Path>,
+        intermediate: Boolean
+    ) {
         D8.run(
-            D8Command.builder().setIntermediate(true).setMode(CompilationMode.RELEASE)
+            D8Command.builder().setIntermediate(intermediate).setMode(CompilationMode.RELEASE)
                 .addProgramFiles(jarFile).addLibraryFiles(libraryJars).addClasspathFiles(jars)
                 .setOutput(jarFile.parent, OutputMode.DexIndexed).build()
         )
