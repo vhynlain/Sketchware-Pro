@@ -7,6 +7,11 @@ import static mod.hey.studios.build.BuildSettings.SETTING_ENABLE_LOGCAT;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_10;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_11;
+import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_12;
+import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_13;
+import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_14;
+import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_15;
+import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_16;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_1_7;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_1_8;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_1_9;
@@ -54,7 +59,8 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
     }
 
     public static String[] getAvailableJavaVersions() {
-        return new String[]{SETTING_JAVA_VERSION_1_7, SETTING_JAVA_VERSION_1_8, SETTING_JAVA_VERSION_1_9, SETTING_JAVA_VERSION_10, SETTING_JAVA_VERSION_11,};
+        return new String[]{SETTING_JAVA_VERSION_1_7, SETTING_JAVA_VERSION_1_8, SETTING_JAVA_VERSION_1_9, SETTING_JAVA_VERSION_10, SETTING_JAVA_VERSION_11,
+                SETTING_JAVA_VERSION_12, SETTING_JAVA_VERSION_13, SETTING_JAVA_VERSION_14, SETTING_JAVA_VERSION_15, SETTING_JAVA_VERSION_16};
     }
 
     public static void handleJavaVersionChange(String choice) {
@@ -91,8 +97,15 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
         binding.tilAndroidJar.getEditText().setText(projectSettings.getValue(SETTING_ANDROID_JAR_PATH, ""));
         binding.tilClasspath.getEditText().setText(projectSettings.getValue(SETTING_CLASSPATH, ""));
 
-        setRadioGroupOptions(binding.rgDexer, new String[]{"Dx", "D8"}, SETTING_DEXER, "Dx");
-        setRadioGroupOptions(binding.rgJavaVersion, getAvailableJavaVersions(), SETTING_JAVA_VERSION, "1.7");
+        setRadioGroupOptions(binding.rgDexer, new String[]{"Dx", "D8"}, SETTING_DEXER, "D8");
+        setRadioGroupOptions(binding.rgJavaVersion, getAvailableJavaVersions(), SETTING_JAVA_VERSION, "16");
+
+        binding.rgJavaVersion.post(() -> {
+            View checked = binding.rgJavaVersion.findViewById(binding.rgJavaVersion.getCheckedRadioButtonId());
+            if (checked != null) {
+                binding.svJavaVersion.scrollTo(Math.max(0, checked.getLeft() - 48), 0);
+            }
+        });
 
         setCheckboxValue(binding.cbNoWarnings, SETTING_NO_WARNINGS, true);
         setCheckboxValue(binding.cbNoHttpLegacy, SETTING_NO_HTTP_LEGACY, false);
@@ -136,7 +149,10 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
             RadioButton radioButton = new RadioButton(radioGroup.getContext());
             radioButton.setText(option);
             radioButton.setId(View.generateViewId());
-            radioButton.setLayoutParams(new RadioGroup.LayoutParams(0, -2, 1f));
+            // A few options share the row evenly, many options keep their natural width and scroll horizontally
+            radioButton.setLayoutParams(options.length <= 4
+                    ? new RadioGroup.LayoutParams(0, -2, 1f)
+                    : new RadioGroup.LayoutParams(-2, -2));
             if (value.equals(option)) {
                 radioButton.setChecked(true);
             }
