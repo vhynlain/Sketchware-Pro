@@ -12,6 +12,7 @@ import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_13;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_14;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_15;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_16;
+import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_17;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_1_7;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_1_8;
 import static mod.hey.studios.build.BuildSettings.SETTING_JAVA_VERSION_1_9;
@@ -60,7 +61,7 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
 
     public static String[] getAvailableJavaVersions() {
         return new String[]{SETTING_JAVA_VERSION_1_7, SETTING_JAVA_VERSION_1_8, SETTING_JAVA_VERSION_1_9, SETTING_JAVA_VERSION_10, SETTING_JAVA_VERSION_11,
-                SETTING_JAVA_VERSION_12, SETTING_JAVA_VERSION_13, SETTING_JAVA_VERSION_14, SETTING_JAVA_VERSION_15, SETTING_JAVA_VERSION_16};
+                SETTING_JAVA_VERSION_12, SETTING_JAVA_VERSION_13, SETTING_JAVA_VERSION_14, SETTING_JAVA_VERSION_15, SETTING_JAVA_VERSION_16, SETTING_JAVA_VERSION_17};
     }
 
     public static void handleJavaVersionChange(String choice) {
@@ -97,8 +98,8 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
         binding.tilAndroidJar.getEditText().setText(projectSettings.getValue(SETTING_ANDROID_JAR_PATH, ""));
         binding.tilClasspath.getEditText().setText(projectSettings.getValue(SETTING_CLASSPATH, ""));
 
-        setRadioGroupOptions(binding.rgDexer, new String[]{"Dx", "D8"}, SETTING_DEXER, "D8");
-        setRadioGroupOptions(binding.rgJavaVersion, getAvailableJavaVersions(), SETTING_JAVA_VERSION, "16");
+        setRadioGroupOptions(binding.rgDexer, new String[]{"Dx", "D8"}, SETTING_DEXER, BuildSettings.DEFAULT_DEXER);
+        setRadioGroupOptions(binding.rgJavaVersion, getAvailableJavaVersions(), SETTING_JAVA_VERSION, BuildSettings.DEFAULT_JAVA_VERSION);
 
         binding.rgJavaVersion.post(() -> {
             View checked = binding.rgJavaVersion.findViewById(binding.rgJavaVersion.getCheckedRadioButtonId());
@@ -111,6 +112,9 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
         setCheckboxValue(binding.cbNoHttpLegacy, SETTING_NO_HTTP_LEGACY, false);
         setCheckboxValue(binding.cbEnableLogcat, SETTING_ENABLE_LOGCAT, true);
 
+        // Persist what is shown, so an untouched default is also what the build reads
+        persistDefaultsIfMissing();
+
         binding.btnCancel.setOnClickListener(v -> dismiss());
         binding.btnSave.setOnClickListener(v -> {
             projectSettings.setValues(views);
@@ -122,6 +126,13 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
+    }
+
+    private void persistDefaultsIfMissing() {
+        if (projectSettings.getValue(SETTING_JAVA_VERSION, "").isEmpty()
+                || projectSettings.getValue(SETTING_DEXER, "").isEmpty()) {
+            projectSettings.setValues(views);
+        }
     }
 
     private void initializeViews() {
