@@ -352,22 +352,32 @@ public class yq {
 
     /**
      * Generates DebugActivity.java, SketchApplication.java, and SketchLogger.java, if necessary.
+     *
+     * PATCH: DebugActivity.java and the crash handler in SketchApplication.java are now only
+     * generated when logcat is enabled (debug build + enable_logcat). Otherwise SketchApplication
+     * is a plain Application (kept because the manifest most likely references it).
      */
     public void generateDebugFiles(Context context) {
         boolean logcatEnabled = N.isDebugBuild && new BuildSettings(sc_id).getValue(
                         BuildSettings.SETTING_ENABLE_LOGCAT, BuildSettings.SETTING_GENERIC_VALUE_TRUE)
                 .equals(BuildSettings.SETTING_GENERIC_VALUE_TRUE);
 
+        // Ganti ke "N.isDebugBuild" kalau layar crash tetap diinginkan di debug build
+        // walau logcat dimatikan.
+        boolean crashHandlerEnabled = logcatEnabled;
+
         String javaDir = FileUtil.getExternalStorageDir() + "/.sketchware/data/" + sc_id + "/files/java/";
 
-        File debugActivityFile = new File(javaDir, "DebugActivity.java");
-        if (!debugActivityFile.exists()) {
-            String debugActivityContent = fileUtil.b(
-                    context,
-                    "debug" + File.separator + "DebugActivity.java"
-            );
-            debugActivityContent = PACKAGE_PLACEHOLDER_PATTERN.matcher(debugActivityContent).replaceAll(packageName);
-            fileUtil.b(javaFilesPath + File.separator + packageNameAsFolders + File.separator + "DebugActivity.java", debugActivityContent);
+        if (crashHandlerEnabled) {
+            File debugActivityFile = new File(javaDir, "DebugActivity.java");
+            if (!debugActivityFile.exists()) {
+                String debugActivityContent = fileUtil.b(
+                        context,
+                        "debug" + File.separator + "DebugActivity.java"
+                );
+                debugActivityContent = PACKAGE_PLACEHOLDER_PATTERN.matcher(debugActivityContent).replaceAll(packageName);
+                fileUtil.b(javaFilesPath + File.separator + packageNameAsFolders + File.separator + "DebugActivity.java", debugActivityContent);
+            }
         }
 
         String customApplicationClassName = new ProjectSettings(sc_id).getValue(
@@ -396,13 +406,38 @@ public class yq {
             );
             sketchApplicationFileContent = PACKAGE_PLACEHOLDER_PATTERN.matcher(sketchApplicationFileContent).replaceAll(packageName);
 
+            if (!crashHandlerEnabled) {
+                // Application polos tanpa uncaught exception handler.
+                // Anchor yang dipakai replace di bawah tetap ada:
+                // "import android.util.Log;", "mApplicationContext = getApplicationContext();",
+                // "super.onCreate();", dan "Application {".
+                sketchApplicationFileContent =
+                        "package " + packageName + ";\n\n" +
+                                "import android.app.Application;\n" +
+                                "import android.content.Context;\n" +
+                                "import android.util.Log;\n\n" +
+                                "public class SketchApplication extends Application {\n\n" +
+                                "    private static Context mApplicationContext;\n\n" +
+                                "    public static Context getContext() {\n" +
+                                "        return mApplicationContext;\n" +
+                                "    }\n\n" +
+                                "    @Override\n" +
+                                "    public void onCreate() {\n" +
+                                "        mApplicationContext = getApplicationContext();\n" +
+                                "        super.onCreate();\n" +
+                                "    }\n" +
+                                "}\n";
+            }
+
             if (applyMultiDex) {
                 sketchApplicationFileContent = sketchApplicationFileContent.replaceAll(
                         "Application \\{", "androidx.multidex.MultiDexApplication {");
             }
             if (logcatEnabled) {
+                // Dipasang di attachBaseContext (paling awal), bukan onCreate, supaya crash
+                // sebelum Application.onCreate() (mis. ContentProvider) ikut tertangkap.
                 sketchApplicationFileContent = sketchApplicationFileContent.replace(
-                                "super.onCreate();", "SketchLogger.startLogging();\n        super.onCreate();")
+                                "mApplicationContext = this;", "mApplicationContext = this;\n        SketchLogger.startLogging();")
                         .replace("Process.killProcess(Process.myPid());",
                                 "SketchLogger.broadcastLog(Log.getStackTraceString(throwable));\n" +
                                         "                    Process.killProcess(Process.myPid());"
@@ -420,7 +455,11 @@ public class yq {
                 sketchApplicationFileContent = sketchApplicationFileContent.replaceAll(
                         "package " + packageName + ";", "package " + customClassPackage + ";");
 
-                String imports = "import android.util.Log;\nimport " + packageName + ".DebugActivity;";
+                // Import hanya untuk class yang benar-benar dibuat, kalau tidak compile error.
+                String imports = "import android.util.Log;";
+                if (crashHandlerEnabled) {
+                    imports += "\nimport " + packageName + ".DebugActivity;";
+                }
                 if (logcatEnabled) {
                     imports += "\nimport " + packageName + ".SketchLogger;";
                 }
