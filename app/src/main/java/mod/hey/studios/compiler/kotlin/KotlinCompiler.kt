@@ -51,6 +51,12 @@ class KotlinCompiler(
         val collector = DiagnosticCollector()
         val plugins = getCompilerPlugins(workspace).map(File::getAbsolutePath).toTypedArray()
 
+        // Follow the Java version chosen in Build Settings, so Kotlin and Java output match
+        val javaVersion = builder.build_settings.getValue(
+            BuildSettings.SETTING_JAVA_VERSION,
+            BuildSettings.DEFAULT_JAVA_VERSION
+        )
+
         val args = K2JVMCompilerArguments().apply {
             compileJava = false
             includeRuntime = false
@@ -58,12 +64,14 @@ class KotlinCompiler(
             noReflect = true
             noStdlib = true
 
+            jvmTarget = toKotlinJvmTarget(javaVersion)
+
             kotlinHome = mKotlinHome.absolutePath
             destination = mClassOutput.absolutePath
             pluginClasspaths = plugins
         }
 
-        LogUtil.d(TAG, "Running kotlinc with these arguments: $arguments")
+        LogUtil.d(TAG, "Running kotlinc with these arguments: $arguments (jvmTarget=${args.jvmTarget})")
 
         compiler.parseArguments(arguments.toTypedArray(), args)
         compiler.exec(collector, Services.EMPTY, args)
@@ -84,6 +92,15 @@ class KotlinCompiler(
                 "Compiling Kotlin files took ${System.currentTimeMillis() - timeMillis} ms"
             )
         }
+    }
+
+    /**
+     * Kotlin has no JVM target "1.7" and spells Java 9 as "9" instead of "1.9".
+     */
+    private fun toKotlinJvmTarget(javaVersion: String): String = when (javaVersion) {
+        "1.7", "1.8" -> "1.8"
+        "1.9" -> "9"
+        else -> javaVersion
     }
 
     private fun areWarningsEnabled(): Boolean {
