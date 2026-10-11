@@ -15,21 +15,27 @@ public class SketchApplication extends Application {
     }
 
     @Override
-    public void onCreate() {
-        mApplicationContext = getApplicationContext();
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
+        mApplicationContext = this;
 
         Thread.setDefaultUncaughtExceptionHandler(
                 new Thread.UncaughtExceptionHandler() {
                     @Override
                     public void uncaughtException(Thread thread, Throwable throwable) {
-                        Intent intent = new Intent(getApplicationContext(), DebugActivity.class);
+                        Intent intent = new Intent(mApplicationContext, DebugActivity.class);
                         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                         intent.putExtra("error", Log.getStackTraceString(throwable));
-                        startActivity(intent);
+                        mApplicationContext.startActivity(intent);
                         Process.killProcess(Process.myPid());
                         System.exit(1);
                     }
                 });
+    }
+
+    @Override
+    public void onCreate() {
+        mApplicationContext = getApplicationContext();
         super.onCreate();
     }
 }
