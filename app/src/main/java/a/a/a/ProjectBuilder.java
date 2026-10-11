@@ -577,15 +577,20 @@ public class ProjectBuilder {
             /* Start compiling */
             org.eclipse.jdt.internal.compiler.batch.Main main = new org.eclipse.jdt.internal.compiler.batch.Main(outWriter, errWriter, false, null, null);
             LogUtil.d(TAG, "Running Eclipse compiler with these arguments: " + args);
-            main.compile(args.toArray(new String[0]));
+            boolean compiledSuccessfully = main.compile(args.toArray(new String[0]));
 
             LogUtil.d(TAG, "System.out of Eclipse compiler: " + outOutputStream.getOut());
-            if (main.globalErrorsCount <= 0) {
+            if (compiledSuccessfully && main.globalErrorsCount <= 0) {
                 LogUtil.d(TAG, "System.err of Eclipse compiler: " + errOutputStream.getOut());
                 LogUtil.d(TAG, "Compiling Java files took " + (System.currentTimeMillis() - savedTimeMillis) + " ms");
             } else {
                 LogUtil.e(TAG, "Failed to compile Java files");
-                throw new zy(errOutputStream.getOut());
+                String eclipseOutput = errOutputStream.getOut();
+                if (eclipseOutput == null || eclipseOutput.trim().isEmpty()) {
+                    // ECJ rejected its arguments (e.g. an unsupported -source level) without counting an error
+                    eclipseOutput = "Eclipse compiler failed without any error message. Arguments: " + args;
+                }
+                throw new zy(eclipseOutput);
             }
         }
     }
