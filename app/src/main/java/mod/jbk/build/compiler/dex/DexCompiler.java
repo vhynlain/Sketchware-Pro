@@ -43,7 +43,6 @@ public class DexCompiler {
 
         D8.run(D8Command.builder()
                 .setMode(CompilationMode.RELEASE)
-                .setIntermediate(true)
                 .setMinApiLevel(minApiLevel)
                 .addLibraryFiles(libraryFiles)
                 .setOutput(new File(builder.yq.binDirectoryPath, "dex").toPath(), OutputMode.DexIndexed)
