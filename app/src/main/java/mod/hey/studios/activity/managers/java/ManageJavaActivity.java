@@ -272,24 +272,58 @@ public class ManageJavaActivity extends BaseAppCompatActivity {
         FilePickerCallback callback = new FilePickerCallback() {
             @Override
             public void onFilesSelected(@NotNull List<? extends File> files) {
-                ExecutorService executor = Executors.newSingleThreadExecutor();
-                executor.execute(() -> {
+                runOnUiThread(() -> {
+                    // Files that would overwrite a different, already existing file
+                    List<String> conflicts = new ArrayList<>();
                     for (File file : files) {
-                        String fileContent = FileUtil.readFile(file.getAbsolutePath());
-
-                        if (fileContent.contains("package ")) {
-                            fileContent = fileContent.replaceFirst(PACKAGE_DECL_REGEX, "package " + getCurrentPkgName() + (file.getName().endsWith(".java") ? ";" : "") + "\n");
+                        File target = new File(current_path, file.getName());
+                        boolean sameFile = target.getAbsolutePath().equals(file.getAbsolutePath());
+                        if (!sameFile && FileUtil.isExistFile(target.getAbsolutePath())) {
+                            conflicts.add(file.getName());
                         }
-
-                        FileUtil.writeFile(new File(current_path, file.getName()).getAbsolutePath(), fileContent);
                     }
-                    runOnUiThread(ManageJavaActivity.this::refresh);
-                    executor.shutdown();
+
+                    if (conflicts.isEmpty()) {
+                        importFiles(files, true);
+                        return;
+                    }
+
+                    new MaterialAlertDialogBuilder(ManageJavaActivity.this)
+                            .setTitle("Files already exist")
+                            .setMessage(conflicts.size() + " file(s) already exist and would be overwritten:\n\n"
+                                    + String.join("\n", conflicts))
+                            .setPositiveButton("Overwrite", (dialog, which) -> importFiles(files, true))
+                            .setNeutralButton("Skip existing", (dialog, which) -> importFiles(files, false))
+                            .setNegativeButton("Cancel", null)
+                            .show();
                 });
             }
         };
 
         new FilePickerDialogFragment(options, callback).show(getSupportFragmentManager(), "filePicker");
+    }
+
+    private void importFiles(List<? extends File> files, boolean overwriteExisting) {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        executor.execute(() -> {
+            for (File file : files) {
+                File target = new File(current_path, file.getName());
+                boolean sameFile = target.getAbsolutePath().equals(file.getAbsolutePath());
+                if (!overwriteExisting && !sameFile && FileUtil.isExistFile(target.getAbsolutePath())) {
+                    continue;
+                }
+
+                String fileContent = FileUtil.readFile(file.getAbsolutePath());
+
+                if (fileContent.contains("package ")) {
+                    fileContent = fileContent.replaceFirst(PACKAGE_DECL_REGEX, "package " + getCurrentPkgName() + (file.getName().endsWith(".java") ? ";" : "") + "\n");
+                }
+
+                FileUtil.writeFile(target.getAbsolutePath(), fileContent);
+            }
+            runOnUiThread(ManageJavaActivity.this::refresh);
+            executor.shutdown();
+        });
     }
 
     private void showRenameDialog(int position) {
@@ -299,7 +333,24 @@ public class ManageJavaActivity extends BaseAppCompatActivity {
         var renameOccurrencesCheckBox = dialogBinding.renameOccurrencesCheckBox;
 
         var dialog = new MaterialAlertDialogBuilder(this).setTitle("Rename " + filesAdapter.getFileName(position)).setView(dialogBinding.getRoot()).setNegativeButton("Cancel", (dialogInterface, i) -> dialogInterface.dismiss()).setPositiveButton("Rename", (dialogInterface, i) -> {
-            if (!Helper.getText(inputText).isEmpty()) {
+            String newName = Helper.getText(inputText);
+            if (!newName.isEmpty()) {
+                String oldPath = filesAdapter.getItem(position);
+                File target = new File(current_path, newName);
+
+                // Same name: nothing to do
+                if (target.getAbsolutePath().equals(new File(oldPath).getAbsolutePath())) {
+                    dialogInterface.dismiss();
+                    return;
+                }
+
+                // Never overwrite another file or folder by renaming
+                if (FileUtil.isExistFile(target.getAbsolutePath())) {
+                    SketchwareUtil.toastError((filesAdapter.isFolder(position) ? "Folder" : "File") + " \"" + newName + "\" already exists");
+                    dialogInterface.dismiss();
+                    return;
+                }
+
                 if (!filesAdapter.isFolder(position)) {
                     if (frc.getJavaManifestList().contains(filesAdapter.getFullName(position))) {
                         frc.getJavaManifestList().remove(filesAdapter.getFullName(position));
@@ -308,12 +359,16 @@ public class ManageJavaActivity extends BaseAppCompatActivity {
                     }
 
                     if (renameOccurrencesCheckBox.isChecked()) {
-                        String fileContent = FileUtil.readFile(filesAdapter.getItem(position));
-                        FileUtil.writeFile(filesAdapter.getItem(position), fileContent.replaceAll(filesAdapter.getFileNameWoExt(position), FileUtil.getFileNameNoExtension(Helper.getText(inputText))));
+                        String fileContent = FileUtil.readFile(oldPath);
+                        // Only whole identifiers are replaced ("Main" must not touch "MainActivity"),
+                        // and the old name is quoted so it can't be misread as a regex
+                        String oldNamePattern = "(?<![\\w$])" + Pattern.quote(filesAdapter.getFileNameWoExt(position)) + "(?![\\w$])";
+                        String newBaseName = Matcher.quoteReplacement(FileUtil.getFileNameNoExtension(newName));
+                        FileUtil.writeFile(oldPath, fileContent.replaceAll(oldNamePattern, newBaseName));
                     }
                 }
 
-                FileUtil.renameFile(filesAdapter.getItem(position), new File(current_path, Helper.getText(inputText)).getAbsolutePath());
+                FileUtil.renameFile(oldPath, target.getAbsolutePath());
                 refresh();
                 SketchwareUtil.toast("Renamed successfully");
             }
