@@ -21,6 +21,7 @@ import android.view.View;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.FileProvider;
+import androidx.core.os.BundleCompat;
 import androidx.exifinterface.media.ExifInterface;
 
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
@@ -397,7 +398,7 @@ public class IconCreatorActivity extends BaseAppCompatActivity {
             Bundle extras = data.getExtras();
             if (requestCode == REQUEST_CODE_PICK_CROPPED_ICON && resultCode == RESULT_OK && extras != null) {
                 try {
-                    appIconBitmap = extras.getParcelable("data");
+                    appIconBitmap = BundleCompat.getParcelable(extras, "data", Bitmap.class);
                     iconFilePath = null;
                     BitmapDrawable bd = new BitmapDrawable(getResources(), appIconBitmap);
                     binding.appIcoImg.setBackground(bd);
