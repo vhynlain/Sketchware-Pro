@@ -22,6 +22,7 @@ import java.io.File;
 
 import a.a.a.GB;
 import pro.sketchware.R;
+import pro.sketchware.utility.ApiCompat;
 import pro.sketchware.utility.SketchwareUtil;
 
 public class CollectErrorActivity extends BaseAppCompatActivity {
@@ -55,7 +56,7 @@ public class CollectErrorActivity extends BaseAppCompatActivity {
                 PackageInfo info;
 
                 try {
-                    info = getPackageManager().getPackageInfo(getPackageName(), 0);
+                    info = ApiCompat.getPackageInfo(getPackageManager(), getPackageName(), 0);
                 } catch (PackageManager.NameNotFoundException e) {
                     messageView.setTextIsSelectable(true);
                     messageView.setText("Somehow couldn't get package info. Stack trace:\n" + Log.getStackTraceString(e));
