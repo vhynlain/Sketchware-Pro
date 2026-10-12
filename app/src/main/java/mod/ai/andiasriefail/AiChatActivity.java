@@ -1,0 +1,819 @@
+package mod.ai.andiasriefail;
+
+import android.app.Activity;
+import android.content.Context;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Bundle;
+import android.text.InputType;
+import android.util.Log;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.Menu;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.HorizontalScrollView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Spinner;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.ColorUtils;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.color.MaterialColors;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import a.a.a.lC;
+import io.noties.markwon.Markwon;
+
+/**
+ * Chat screen of the AI assistant. The UI is built in code, so the whole feature lives in this one folder.
+ * Started from DesignActivity with the extra "sc_id"; it can only ever touch that project.
+ */
+public class AiChatActivity extends AppCompatActivity implements AiAgent.Listener {
+
+    public static final String EXTRA_SC_ID = "sc_id";
+    private static final String TAG = "AiChatActivity";
+
+    private AiProjectGuard guard;
+    private AiAttachments attachments;
+    private AiLogCollector logs;
+    private AiAgent agent;
+    private Markwon markwon;
+
+    private LinearLayout chat;
+    private ScrollView scroll;
+    private TextView banner;
+    private LinearLayout runBar;
+    private TextView runText;
+    private HorizontalScrollView chipScroll;
+    private LinearLayout chipRow;
+    private EditText input;
+    private MaterialButton sendButton;
+
+    private final List<AiAttachments.Item> pending = new ArrayList<>();
+    private final Map<String, ToolRow> toolRows = new HashMap<>();
+    private boolean backupDone = false;
+    private volatile boolean destroyed = false;
+
+    private final Object confirmLock = new Object();
+    private CountDownLatch confirmLatch;
+    private AtomicBoolean confirmAnswer;
+
+    private int colorSurface, colorOnSurface, colorMuted, colorPrimary, colorOnPrimary, colorBubble, colorOnBubble, colorBlock, colorError, colorOk, colorWarn;
+
+    private final ActivityResultLauncher<String> pickFile = registerForActivityResult(
+            new ActivityResultContracts.GetContent(), this::onPicked);
+
+    // ------------------------------------------------------------------ setup
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        try {
+            String scId = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_SC_ID);
+            guard = new AiProjectGuard(scId);
+        } catch (Throwable t) {
+            Log.e(TAG, "Invalid project", t);
+            Toast.makeText(this, "Proyek tidak valid: " + t.getMessage(), Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
+        try {
+            attachments = new AiAttachments(this, guard.getScId());
+            String pkg = "";
+            try {
+                HashMap<String, Object> meta = lC.b(guard.getScId());
+                if (meta != null && meta.get("my_sc_pkg_name") != null) pkg = String.valueOf(meta.get("my_sc_pkg_name"));
+            } catch (Throwable ignored) {
+            }
+            logs = new AiLogCollector(pkg);
+            logs.start(this);
+            agent = new AiAgent(this, guard, attachments, logs, this);
+            try {
+                markwon = Markwon.create(this);
+            } catch (Throwable t) {
+                markwon = null;
+            }
+            buildUi();
+            addNote("Alat tersedia: " + agent.toolCount() + ". Hanya proyek ini yang bisa diubah.");
+            addAiBubble("Halo! Jelaskan aplikasi yang ingin dibuat atau perubahan pada proyek ini. "
+                    + "Saya bisa mengedit file, mengatur konfigurasi (SDK, versi, izin, library, tema), build, dan memperbaiki error.");
+            if (!AiSettings.hasApiKey(this)) showSettings();
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to build UI", t);
+            Toast.makeText(this, "Gagal membuka asisten: " + t.getMessage(), Toast.LENGTH_LONG).show();
+            finish();
+        }
+    }
+
+    private int dp(float v) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics()));
+    }
+
+    private int attrColor(View v, int attr, int fallback) {
+        try {
+            return MaterialColors.getColor(v, attr, fallback);
+        } catch (Throwable t) {
+            return fallback;
+        }
+    }
+
+    private GradientDrawable rounded(int color, float radiusDp) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(dp(radiusDp));
+        return d;
+    }
+
+    private void buildUi() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+
+        // only attributes that other screens of this app already use
+        colorSurface = attrColor(root, pro.sketchware.R.attr.colorSurface, Color.WHITE);
+        colorOnSurface = attrColor(root, com.google.android.material.R.attr.colorOnSurface, Color.BLACK);
+        colorMuted = attrColor(root, pro.sketchware.R.attr.colorOnSurfaceVariant, Color.GRAY);
+        colorPrimary = attrColor(root, pro.sketchware.R.attr.colorPrimary, 0xFF006A6A);
+        colorOnPrimary = colorSurface;
+        colorBubble = ColorUtils.setAlphaComponent(colorPrimary, 56);
+        colorOnBubble = colorOnSurface;
+        colorBlock = ColorUtils.setAlphaComponent(colorOnSurface, 22);
+        colorError = 0xFFD32F2F;
+        colorOk = 0xFF2E7D32;
+        colorWarn = 0xFFB26A00;
+        root.setBackgroundColor(colorSurface);
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.ime());
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return insets;
+        });
+
+        // toolbar
+        MaterialToolbar toolbar = new MaterialToolbar(this);
+        toolbar.setTitle("Asisten AI");
+        toolbar.setSubtitle("Proyek " + guard.getScId());
+        try {
+            toolbar.setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material);
+            if (toolbar.getNavigationIcon() != null) toolbar.getNavigationIcon().setTint(colorOnSurface);
+        } catch (Throwable ignored) {
+        }
+        toolbar.setNavigationOnClickListener(v -> finish());
+        Menu menu = toolbar.getMenu();
+        menu.add(Menu.NONE, 1, Menu.NONE, "Pengaturan AI");
+        menu.add(Menu.NONE, 2, Menu.NONE, "Percakapan baru");
+        menu.add(Menu.NONE, 3, Menu.NONE, "Pulihkan cadangan proyek");
+        toolbar.setOnMenuItemClickListener(item -> {
+            try {
+                switch (item.getItemId()) {
+                    case 1:
+                        showSettings();
+                        break;
+                    case 2:
+                        newConversation();
+                        break;
+                    case 3:
+                        confirmRestore();
+                        break;
+                    default:
+                        break;
+                }
+            } catch (Throwable t) {
+                showError("Gagal: " + t.getMessage());
+            }
+            return true;
+        });
+        root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        // banner
+        banner = new TextView(this);
+        banner.setTextSize(13);
+        banner.setTextColor(colorMuted);
+        banner.setPadding(dp(16), dp(6), dp(16), dp(6));
+        banner.setVisibility(View.GONE);
+        root.addView(banner, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        // chat
+        scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        chat = new LinearLayout(this);
+        chat.setOrientation(LinearLayout.VERTICAL);
+        chat.setPadding(dp(14), dp(12), dp(14), dp(12));
+        scroll.addView(chat, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        // run bar
+        runBar = new LinearLayout(this);
+        runBar.setOrientation(LinearLayout.HORIZONTAL);
+        runBar.setGravity(Gravity.CENTER_VERTICAL);
+        runBar.setPadding(dp(16), dp(4), dp(8), dp(4));
+        runBar.setBackground(rounded(colorBubble, 20));
+        runText = new TextView(this);
+        runText.setTextColor(colorOnBubble);
+        runText.setTextSize(13);
+        runBar.addView(runText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView stop = new TextView(this);
+        stop.setText("Hentikan");
+        stop.setTextColor(colorError);
+        stop.setTextSize(14);
+        stop.setTypeface(Typeface.DEFAULT_BOLD);
+        stop.setPadding(dp(16), dp(10), dp(16), dp(10));
+        stop.setOnClickListener(v -> stopAgent());
+        runBar.addView(stop, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        runBar.setVisibility(View.GONE);
+        LinearLayout.LayoutParams runLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        runLp.setMargins(dp(12), dp(4), dp(12), dp(4));
+        root.addView(runBar, runLp);
+
+        // attachment chips
+        chipScroll = new HorizontalScrollView(this);
+        chipScroll.setHorizontalScrollBarEnabled(false);
+        chipRow = new LinearLayout(this);
+        chipRow.setOrientation(LinearLayout.HORIZONTAL);
+        chipRow.setPadding(dp(12), dp(4), dp(12), dp(4));
+        chipScroll.addView(chipRow);
+        chipScroll.setVisibility(View.GONE);
+        root.addView(chipScroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        // composer
+        LinearLayout composer = new LinearLayout(this);
+        composer.setOrientation(LinearLayout.HORIZONTAL);
+        composer.setGravity(Gravity.BOTTOM);
+        composer.setPadding(dp(8), dp(6), dp(8), dp(8));
+
+        MaterialButton plus = new MaterialButton(this);
+        plus.setBackgroundTintList(android.content.res.ColorStateList.valueOf(colorBubble));
+        plus.setTextColor(colorOnSurface);
+        plus.setText("+");
+        plus.setTextSize(22);
+        plus.setInsetTop(0);
+        plus.setInsetBottom(0);
+        plus.setMinWidth(0);
+        plus.setMinimumWidth(0);
+        plus.setPadding(dp(14), 0, dp(14), 0);
+        plus.setContentDescription("Tambah lampiran");
+        plus.setOnClickListener(v -> showAttachSheet());
+        LinearLayout.LayoutParams plusLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
+        plusLp.setMargins(0, 0, dp(6), 0);
+        composer.addView(plus, plusLp);
+
+        input = new EditText(this);
+        input.setHint("Jelaskan aplikasi atau perubahan yang kamu mau");
+        input.setTextColor(colorOnSurface);
+        input.setHintTextColor(colorMuted);
+        input.setTextSize(15);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        input.setMaxLines(5);
+        input.setMinHeight(dp(48));
+        input.setPadding(dp(16), dp(10), dp(16), dp(10));
+        input.setBackground(rounded(colorBlock, 24));
+        composer.addView(input, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        sendButton = new MaterialButton(this);
+        sendButton.setText("Kirim");
+        sendButton.setOnClickListener(v -> onSend());
+        LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
+        sendLp.setMargins(dp(6), 0, 0, 0);
+        composer.addView(sendButton, sendLp);
+        root.addView(composer, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        setContentView(root);
+    }
+
+    // --------------------------------------------------------------- UI helpers
+
+    private void ui(Runnable r) {
+        runOnUiThread(() -> {
+            if (destroyed || isFinishing()) return;
+            try {
+                r.run();
+            } catch (Throwable t) {
+                Log.e(TAG, "UI update failed", t);
+            }
+        });
+    }
+
+    private void toBottom() {
+        scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private void toast(String msg) {
+        try {
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void addNote(String text) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextSize(12);
+        tv.setTextColor(colorMuted);
+        tv.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, dp(4), 0, dp(10));
+        chat.addView(tv, lp);
+        toBottom();
+    }
+
+    private void addUserBubble(String text) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextSize(15);
+        tv.setTextColor(colorOnBubble);
+        tv.setPadding(dp(14), dp(10), dp(14), dp(10));
+        tv.setBackground(rounded(colorBubble, 18));
+        tv.setTextIsSelectable(true);
+        tv.setMaxWidth((int) (getResources().getDisplayMetrics().widthPixels * 0.82f));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.gravity = Gravity.END;
+        lp.setMargins(0, dp(6), 0, dp(10));
+        chat.addView(tv, lp);
+        toBottom();
+    }
+
+    private void addAiBubble(String text) {
+        TextView tv = new TextView(this);
+        tv.setTextSize(15);
+        tv.setTextColor(colorOnSurface);
+        tv.setTextIsSelectable(true);
+        try {
+            if (markwon != null) markwon.setMarkdown(tv, text);
+            else tv.setText(text);
+        } catch (Throwable t) {
+            tv.setText(text);
+        }
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, dp(6), 0, dp(10));
+        chat.addView(tv, lp);
+        toBottom();
+    }
+
+    private void showError(String message) {
+        try {
+            TextView tv = new TextView(this);
+            tv.setText(message);
+            tv.setTextSize(14);
+            tv.setTextColor(colorError);
+            tv.setTextIsSelectable(true);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, dp(6), 0, dp(10));
+            chat.addView(tv, lp);
+            toBottom();
+        } catch (Throwable t) {
+            toast(message);
+        }
+    }
+
+    /** One tool call in the chat: a colored bar, a title line and a collapsible output block. */
+    private final class ToolRow {
+        final LinearLayout box = new LinearLayout(AiChatActivity.this);
+        final View bar = new View(AiChatActivity.this);
+        final TextView title = new TextView(AiChatActivity.this);
+        final TextView out = new TextView(AiChatActivity.this);
+        final String name;
+        final String summary;
+
+        ToolRow(String name, String summary) {
+            this.name = name;
+            this.summary = summary == null ? "" : summary;
+            box.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout col = new LinearLayout(AiChatActivity.this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.setPadding(dp(10), dp(2), 0, dp(2));
+            title.setTextSize(13);
+            title.setTypeface(Typeface.MONOSPACE);
+            title.setTextColor(colorOnSurface);
+            title.setPadding(0, dp(4), 0, dp(4));
+            out.setTextSize(12);
+            out.setTypeface(Typeface.MONOSPACE);
+            out.setTextColor(colorOnSurface);
+            out.setBackground(rounded(colorBlock, 8));
+            out.setPadding(dp(10), dp(8), dp(10), dp(8));
+            out.setTextIsSelectable(true);
+            out.setVisibility(View.GONE);
+            title.setOnClickListener(v -> out.setVisibility(out.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+            col.addView(title);
+            col.addView(out);
+            box.addView(bar, new LinearLayout.LayoutParams(dp(3), ViewGroup.LayoutParams.MATCH_PARENT));
+            box.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            setStatus("berjalan", colorPrimary);
+        }
+
+        void setStatus(String status, int color) {
+            bar.setBackgroundColor(color);
+            title.setText(name + (summary.isEmpty() ? "" : "  " + summary) + "  [" + status + "]");
+        }
+
+        void finish(boolean ok, String output) {
+            setStatus(ok ? "berhasil" : "gagal", ok ? colorOk : colorError);
+            out.setText(output == null ? "" : output);
+            if (!ok) out.setVisibility(View.VISIBLE);
+        }
+    }
+
+    // ----------------------------------------------------------------- sending
+
+    private void setRunning(boolean running) {
+        runBar.setVisibility(running ? View.VISIBLE : View.GONE);
+        sendButton.setEnabled(!running);
+        input.setEnabled(!running);
+    }
+
+    private void onSend() {
+        try {
+            if (agent.isRunning()) return;
+            String text = input.getText().toString().trim();
+            if (text.isEmpty() && pending.isEmpty()) return;
+            if (!AiSettings.hasApiKey(this)) {
+                toast("Isi API key dulu");
+                showSettings();
+                return;
+            }
+            final String sendText = text;
+            final List<AiAttachments.Item> items = new ArrayList<>(pending);
+            setRunning(true);
+            runText.setText("Menyiapkan cadangan proyek...");
+
+            if (backupDone) {
+                dispatch(sendText, items);
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    File zip = guard.createBackup();
+                    backupDone = true;
+                    ui(() -> {
+                        banner.setText("Cadangan proyek dibuat: " + zip.getName());
+                        banner.setVisibility(View.VISIBLE);
+                        dispatch(sendText, items);
+                    });
+                } catch (Throwable t) {
+                    Log.e(TAG, "Backup failed", t);
+                    ui(() -> {
+                        setRunning(false);
+                        showError("Cadangan proyek gagal, asisten tidak dijalankan demi keamanan: " + t.getMessage());
+                    });
+                }
+            }, "ai-backup").start();
+        } catch (Throwable t) {
+            setRunning(false);
+            showError("Gagal mengirim: " + t.getMessage());
+        }
+    }
+
+    private void dispatch(String text, List<AiAttachments.Item> items) {
+        try {
+            StringBuilder shown = new StringBuilder(text);
+            for (AiAttachments.Item i : items) {
+                if (shown.length() > 0) shown.append('\n');
+                shown.append("[").append(i.id).append(": ").append(i.displayName).append("]");
+            }
+            addUserBubble(shown.toString());
+            input.setText("");
+            pending.clear();
+            refreshChips();
+            runText.setText("Langkah 0 dari " + AiSettings.getMaxSteps(this));
+            if (!agent.start(text, items)) {
+                setRunning(false);
+            }
+        } catch (Throwable t) {
+            setRunning(false);
+            showError("Gagal memulai: " + t.getMessage());
+        }
+    }
+
+    private void stopAgent() {
+        try {
+            agent.stop();
+            releaseConfirm(false);
+            runText.setText("Menghentikan...");
+        } catch (Throwable t) {
+            Log.e(TAG, "stop failed", t);
+        }
+    }
+
+    private void newConversation() {
+        if (agent.isRunning()) {
+            toast("Tunggu selesai atau hentikan dulu");
+            return;
+        }
+        agent.resetConversation();
+        attachments.clear();
+        pending.clear();
+        toolRows.clear();
+        chat.removeAllViews();
+        refreshChips();
+        addAiBubble("Percakapan baru dimulai. Apa yang ingin dikerjakan?");
+    }
+
+    private void confirmRestore() {
+        if (agent.isRunning()) {
+            toast("Tunggu asisten selesai dulu");
+            return;
+        }
+        File latest = guard.getLatestBackup();
+        if (latest == null) {
+            toast("Belum ada cadangan untuk proyek ini");
+            return;
+        }
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Pulihkan cadangan?")
+                .setMessage("File proyek akan dikembalikan ke " + latest.getName() + ". File yang berubah setelahnya akan ditimpa.")
+                .setNegativeButton("Batal", null)
+                .setPositiveButton("Pulihkan", (d, w) -> new Thread(() -> {
+                    try {
+                        int count = guard.restoreLatestBackup();
+                        ui(() -> addNote("Cadangan dipulihkan (" + count + " file)."));
+                    } catch (Throwable t) {
+                        ui(() -> showError("Gagal memulihkan: " + t.getMessage()));
+                    }
+                }, "ai-restore").start())
+                .show();
+    }
+
+    // ------------------------------------------------------------- attachments
+
+    private void showAttachSheet() {
+        try {
+            BottomSheetDialog sheet = new BottomSheetDialog(this);
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.setPadding(dp(8), dp(12), dp(8), dp(20));
+            String[][] options = {{"Gambar", "image/*"}, {"File", "*/*"}};
+            for (String[] option : options) {
+                TextView row = new TextView(this);
+                row.setText(option[0]);
+                row.setTextSize(16);
+                row.setTextColor(colorOnSurface);
+                row.setPadding(dp(20), dp(16), dp(20), dp(16));
+                row.setOnClickListener(v -> {
+                    sheet.dismiss();
+                    try {
+                        pickFile.launch(option[1]);
+                    } catch (Throwable t) {
+                        toast("Tidak bisa membuka pemilih file");
+                    }
+                });
+                col.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
+            sheet.setContentView(col);
+            sheet.show();
+        } catch (Throwable t) {
+            showError("Gagal membuka menu lampiran: " + t.getMessage());
+        }
+    }
+
+    private void onPicked(Uri uri) {
+        if (uri == null) return;
+        final Context context = this;
+        new Thread(() -> {
+            try {
+                AiAttachments.Item item = attachments.add(context, uri);
+                ui(() -> {
+                    pending.add(item);
+                    refreshChips();
+                });
+            } catch (Throwable t) {
+                Log.e(TAG, "Attach failed", t);
+                ui(() -> toast("Gagal melampirkan: " + t.getMessage()));
+            }
+        }, "ai-attach").start();
+    }
+
+    private void refreshChips() {
+        chipRow.removeAllViews();
+        for (AiAttachments.Item item : pending) {
+            TextView chip = new TextView(this);
+            chip.setText(item.id + "  " + item.displayName + "  \u2715");
+            chip.setTextSize(13);
+            chip.setTextColor(colorOnBubble);
+            chip.setBackground(rounded(colorBubble, 16));
+            chip.setPadding(dp(12), dp(6), dp(12), dp(6));
+            chip.setOnClickListener(v -> {
+                pending.remove(item);
+                attachments.remove(item.id);
+                refreshChips();
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, 0, dp(8), 0);
+            chipRow.addView(chip, lp);
+        }
+        chipScroll.setVisibility(pending.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    // ---------------------------------------------------------------- settings
+
+    private void showSettings() {
+        try {
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.setPadding(dp(24), dp(12), dp(24), 0);
+
+            TextView modelLabel = new TextView(this);
+            modelLabel.setText("Model");
+            col.addView(modelLabel);
+            Spinner spinner = new Spinner(this);
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, AiSettings.MODELS);
+            spinner.setAdapter(adapter);
+            int index = Arrays.asList(AiSettings.MODELS).indexOf(AiSettings.getModel(this));
+            spinner.setSelection(Math.max(0, index));
+            col.addView(spinner);
+
+            TextView keyLabel = new TextView(this);
+            keyLabel.setText("API key");
+            keyLabel.setPadding(0, dp(12), 0, 0);
+            col.addView(keyLabel);
+            EditText key = new EditText(this);
+            key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            key.setHint(AiSettings.hasApiKey(this) ? "Sudah tersimpan. Kosongkan jika tidak diubah" : "sk-ant-...");
+            key.setSingleLine(true);
+            col.addView(key);
+            TextView keyHelp = new TextView(this);
+            keyHelp.setText("Key disimpan terenkripsi di perangkat ini.");
+            keyHelp.setTextSize(12);
+            keyHelp.setTextColor(colorMuted);
+            col.addView(keyHelp);
+
+            TextView stepsLabel = new TextView(this);
+            stepsLabel.setText("Batas langkah per tugas (" + AiSettings.MIN_STEPS + " sampai " + AiSettings.MAX_STEPS + ")");
+            stepsLabel.setPadding(0, dp(12), 0, 0);
+            col.addView(stepsLabel);
+            EditText steps = new EditText(this);
+            steps.setInputType(InputType.TYPE_CLASS_NUMBER);
+            steps.setText(String.valueOf(AiSettings.getMaxSteps(this)));
+            col.addView(steps);
+
+            CheckBox askBuild = new CheckBox(this);
+            askBuild.setText("Minta izin sebelum setiap build");
+            askBuild.setChecked(AiSettings.isAskBeforeBuild(this));
+            col.addView(askBuild);
+
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Pengaturan AI")
+                    .setView(col)
+                    .setNegativeButton("Batal", null)
+                    .setNeutralButton("Hapus key", (d, w) -> {
+                        AiSettings.setApiKey(this, "");
+                        toast("API key dihapus");
+                    })
+                    .setPositiveButton("Simpan", (d, w) -> {
+                        try {
+                            Object selected = spinner.getSelectedItem();
+                            if (selected != null) AiSettings.setModel(this, String.valueOf(selected));
+                            String newKey = key.getText().toString().trim();
+                            if (!newKey.isEmpty() && !AiSettings.setApiKey(this, newKey)) {
+                                toast("Gagal menyimpan key");
+                                return;
+                            }
+                            try {
+                                AiSettings.setMaxSteps(this, Integer.parseInt(steps.getText().toString().trim()));
+                            } catch (NumberFormatException e) {
+                                toast("Batas langkah tidak valid, tidak diubah");
+                            }
+                            AiSettings.setAskBeforeBuild(this, askBuild.isChecked());
+                            toast("Pengaturan disimpan");
+                        } catch (Throwable t) {
+                            toast("Gagal menyimpan: " + t.getMessage());
+                        }
+                    })
+                    .show();
+        } catch (Throwable t) {
+            showError("Gagal membuka pengaturan: " + t.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------- AiAgent.Listener
+
+    @Override
+    public void onAssistantText(String text) {
+        ui(() -> addAiBubble(text));
+    }
+
+    @Override
+    public void onToolStart(String callId, String name, String summary) {
+        ui(() -> {
+            ToolRow row = new ToolRow(name, summary);
+            toolRows.put(callId, row);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(dp(4), dp(2), 0, dp(6));
+            chat.addView(row.box, lp);
+            toBottom();
+        });
+    }
+
+    @Override
+    public void onToolEnd(String callId, boolean ok, String output) {
+        ui(() -> {
+            ToolRow row = toolRows.get(callId);
+            if (row != null) row.finish(ok, output);
+        });
+    }
+
+    @Override
+    public void onStep(int used, int max) {
+        ui(() -> runText.setText("Langkah " + used + " dari " + max));
+    }
+
+    @Override
+    public void onError(String message) {
+        ui(() -> showError(message));
+    }
+
+    @Override
+    public boolean confirm(String title, String text) {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean answer = new AtomicBoolean(false);
+        synchronized (confirmLock) {
+            confirmLatch = latch;
+            confirmAnswer = answer;
+        }
+        runOnUiThread(() -> {
+            if (destroyed || isFinishing()) {
+                releaseConfirm(false);
+                return;
+            }
+            try {
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle("Izin diperlukan")
+                        .setMessage(text)
+                        .setCancelable(false)
+                        .setNegativeButton("Tolak", (d, w) -> releaseConfirm(false))
+                        .setPositiveButton("Izinkan", (d, w) -> releaseConfirm(true))
+                        .show();
+            } catch (Throwable t) {
+                releaseConfirm(false);
+            }
+        });
+        try {
+            if (!latch.await(10, TimeUnit.MINUTES)) return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return answer.get();
+    }
+
+    private void releaseConfirm(boolean allowed) {
+        synchronized (confirmLock) {
+            if (confirmLatch != null) {
+                confirmAnswer.set(allowed);
+                confirmLatch.countDown();
+                confirmLatch = null;
+            }
+        }
+    }
+
+    @Override
+    public void onFinished(String note) {
+        ui(() -> {
+            setRunning(false);
+            if ("dihentikan".equals(note)) addNote("Dihentikan.");
+            else if (note != null && note.startsWith("batas langkah")) addNote("Berhenti: " + note + ". Kirim pesan lagi untuk melanjutkan.");
+            else if (note != null && note.startsWith("jawaban terpotong")) addNote("Jawaban terpotong. Kirim 'lanjutkan' untuk meneruskan.");
+        });
+    }
+
+    // --------------------------------------------------------------- lifecycle
+
+    @Override
+    protected void onDestroy() {
+        destroyed = true;
+        try {
+            releaseConfirm(false);
+            if (agent != null) agent.close();
+            if (logs != null) logs.stop();
+            if (attachments != null) attachments.clear();
+        } catch (Throwable t) {
+            Log.e(TAG, "onDestroy cleanup failed", t);
+        }
+        super.onDestroy();
+    }
+}
