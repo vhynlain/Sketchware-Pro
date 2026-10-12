@@ -528,7 +528,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
 
         bottomPopupMenu = new PopupMenu(this, btnOptions);
         bottomMenu = bottomPopupMenu.getMenu();
-        bottomMenu.add(Menu.NONE, 6, Menu.NONE, "Asisten AI").setOnMenuItemClickListener(item -> {
+        bottomMenu.add(Menu.NONE, 8, Menu.NONE, "Asisten AI").setOnMenuItemClickListener(item -> {
             try {
                 Intent aiIntent = new Intent(this, AiChatActivity.class);
                 aiIntent.putExtra(AiChatActivity.EXTRA_SC_ID, sc_id);
