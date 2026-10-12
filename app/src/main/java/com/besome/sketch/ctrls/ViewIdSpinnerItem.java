@@ -9,6 +9,8 @@ import android.widget.LinearLayout;
 import pro.sketchware.R;
 import pro.sketchware.databinding.VarIdSpinnerItemBinding;
 
+import androidx.core.content.ContextCompat;
+
 public class ViewIdSpinnerItem extends LinearLayout {
 
     private boolean isDropDown;
@@ -32,7 +34,7 @@ public class ViewIdSpinnerItem extends LinearLayout {
             a(false, 0xffff5555, 0xfff8f820);
         } else {
             binding.name.setText(text);
-            a(true, getResources().getColor(R.color.view_property_spinner_filter), getResources().getColor(R.color.view_property_spinner_filter));
+            a(true, ContextCompat.getColor(getContext(), R.color.view_property_spinner_filter), ContextCompat.getColor(getContext(), R.color.view_property_spinner_filter));
         }
 
         binding.icon.setImageResource(iconResId);
