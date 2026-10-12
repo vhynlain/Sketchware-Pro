@@ -13,6 +13,7 @@ import android.util.Pair;
 import com.besome.sketch.beans.ProjectFileBean;
 import com.google.gson.Gson;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -505,8 +506,21 @@ public class Ix {
         applicationTag.addAttribute("android", "icon", "@mipmap/ic_launcher");
         applicationTag.addAttribute("android", "label", "@string/app_name");
 
+        // Harus sama dengan logcatEnabled/crashHandlerEnabled di yq.generateDebugFiles()
+        boolean logcatEnabled = c.isDebugBuild && buildSettings.getValue(
+                        BuildSettings.SETTING_ENABLE_LOGCAT, BuildSettings.SETTING_GENERIC_VALUE_TRUE)
+                .equals(BuildSettings.SETTING_GENERIC_VALUE_TRUE);
+        boolean crashHandlerEnabled = logcatEnabled;
+
         String applicationClassName = settings.getValue(ProjectSettings.SETTING_APPLICATION_CLASS, ".SketchApplication");
-        applicationTag.addAttribute("android", "name", applicationClassName);
+        boolean usingDefaultApplicationClass = applicationClassName.equals(".SketchApplication");
+        boolean userHasOwnApplicationFile = new File(FileUtil.getExternalStorageDir()
+                + "/.sketchware/data/" + c.sc_id + "/files/java/SketchApplication.java").exists();
+        // Tanpa crash handler dan tanpa class buatan pengguna, SketchApplication tidak dibuat,
+        // jadi android:name tidak boleh ditulis (kalau tidak, app crash saat start).
+        if (crashHandlerEnabled || !usingDefaultApplicationClass || userHasOwnApplicationFile) {
+            applicationTag.addAttribute("android", "name", applicationClassName);
+        }
         if (addRequestLegacyExternalStorage) {
             applicationTag.addAttribute("android", "requestLegacyExternalStorage", "true");
         }
@@ -578,7 +592,7 @@ public class Ix {
             }
         }
 
-        if (!hasDebugActivity) {
+        if (!hasDebugActivity && crashHandlerEnabled) {
             XmlBuilder activityTag = new XmlBuilder("activity");
             activityTag.addAttribute("android", "name", ".DebugActivity");
             activityTag.addAttribute("android", "screenOrientation", "portrait");

@@ -398,7 +398,12 @@ public class yq {
         File targetApplicationFile = new File(javaDir + File.separator +
                 customApplicationClassName.substring(1).replace('.', '/') + ".java");
 
-        if (!targetApplicationFile.exists()) {
+        // SketchApplication default hanya dibuat saat crash handler/logcat ON. Kalau OFF dan memakai
+        // class default, tidak dibuat sama sekali (Ix.java juga tidak menulis android:name).
+        // Kalau project memakai custom application class, tetap dibuat karena manifest merujuknya.
+        boolean generateApplicationFile = crashHandlerEnabled || !notUsingCustomApplicationClass;
+
+        if (generateApplicationFile && !targetApplicationFile.exists()) {
             boolean applyMultiDex = projectSettings.getMinSdkVersion() < 21;
             String sketchApplicationFileContent = fileUtil.b(
                     context,
