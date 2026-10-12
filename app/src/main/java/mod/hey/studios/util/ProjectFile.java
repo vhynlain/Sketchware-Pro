@@ -1,5 +1,6 @@
 package mod.hey.studios.util;
 
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Build;
 
@@ -41,22 +42,30 @@ public class ProjectFile {
 	*/
 
     public static int getDefaultColor(String color) {
-        // Check if the device is running Android 12 or above
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Android 12+ (API level 31): Use Material 3 dynamic colors
+            // Android 12+ (API 31): follow the system dynamic (Material You) colors
+            Context context = SketchApplication.getContext();
             return switch (color) {
-                case "color_primary_dark" ->
-                        SketchApplication.getContext().getColor(android.R.color.system_accent1_500);
-                case "color_control_highlight" ->
-                        SketchApplication.getContext().getColor(android.R.color.system_accent1_100);
-                default ->
-                        SketchApplication.getContext().getColor(android.R.color.system_accent1_500);
+                case COLOR_PRIMARY ->
+                        context.getColor(android.R.color.system_accent1_600);
+                case COLOR_PRIMARY_DARK ->
+                        context.getColor(android.R.color.system_accent1_700);
+                case COLOR_ACCENT ->
+                        context.getColor(android.R.color.system_accent2_500);
+                case COLOR_CONTROL_HIGHLIGHT ->
+                        context.getColor(android.R.color.system_accent1_100);
+                case COLOR_CONTROL_NORMAL ->
+                        context.getColor(android.R.color.system_neutral2_500);
+                default -> context.getColor(android.R.color.system_accent1_500);
             };
         } else {
-            // For Android versions below 12: use static fallback colors
+            // Below Android 12: static fallback colors
             return switch (color) {
-                case "color_primary_dark" -> Color.parseColor("#ff1976d2");
-                case "color_control_highlight" -> Color.parseColor("#202196f3");
+                case COLOR_PRIMARY -> Color.parseColor("#ff2196f3");
+                case COLOR_PRIMARY_DARK -> Color.parseColor("#ff1976d2");
+                case COLOR_ACCENT -> Color.parseColor("#ff2196f3");
+                case COLOR_CONTROL_HIGHLIGHT -> Color.parseColor("#202196f3");
+                case COLOR_CONTROL_NORMAL -> Color.parseColor("#ff757575");
                 default -> Color.parseColor("#ff2196f3");
             };
         }
