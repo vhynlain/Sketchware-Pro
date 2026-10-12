@@ -13,6 +13,7 @@ import android.graphics.PorterDuff;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.util.Pair;
 import android.view.Gravity;
@@ -177,7 +178,7 @@ public class ImportIconActivity extends BaseAppCompatActivity implements IconAda
         });
 
 
-        new Handler().postDelayed(() -> new InitialIconLoader(this).execute(), 300L);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> new InitialIconLoader(this).execute(), 300L);
     }
 
     @Override
