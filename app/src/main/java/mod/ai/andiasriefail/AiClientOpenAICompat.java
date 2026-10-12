@@ -122,7 +122,12 @@ public final class AiClientOpenAICompat {
     public JSONObject send(String apiKey, String model, String systemPrompt,
                            JSONArray claudeHistory, JSONArray tools) throws AiClient.AiException {
         validateApiKey(apiKey);
-        String body = buildRequestBody(model, systemPrompt, claudeHistory, tools, false).toString();
+        String body;
+        try {
+            body = buildRequestBody(model, systemPrompt, claudeHistory, tools, false).toString();
+        } catch (Throwable t) {
+            throw new AiClient.AiException("Gagal menyusun permintaan " + providerName + ": " + t.getMessage());
+        }
         Request request = buildRequest(apiKey, body);
 
         AiClient.AiException lastErr = null;
