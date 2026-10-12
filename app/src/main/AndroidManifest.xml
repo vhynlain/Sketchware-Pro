@@ -277,6 +277,11 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
         <activity
+            android:name="mod.ai.andiasriefail.AiChatActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name="pro.sketchware.activities.main.fragments.projects_store.ProjectPreviewActivity"
             android:configChanges="orientation|screenSize"
             android:theme="@style/Theme.SketchwarePro.ProjectPreview" />
