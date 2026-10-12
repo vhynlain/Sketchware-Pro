@@ -513,12 +513,15 @@ public class Ix {
         boolean crashHandlerEnabled = logcatEnabled;
 
         String applicationClassName = settings.getValue(ProjectSettings.SETTING_APPLICATION_CLASS, ".SketchApplication");
-        boolean usingDefaultApplicationClass = applicationClassName.equals(".SketchApplication");
+        // Lokasi file class yang sama dengan yang dipakai yq.generateDebugFiles()
+        String normalizedApplicationClassName = applicationClassName.startsWith(".")
+                ? applicationClassName : "." + applicationClassName;
         boolean userHasOwnApplicationFile = new File(FileUtil.getExternalStorageDir()
-                + "/.sketchware/data/" + c.sc_id + "/files/java/SketchApplication.java").exists();
-        // Tanpa crash handler dan tanpa class buatan pengguna, SketchApplication tidak dibuat,
-        // jadi android:name tidak boleh ditulis (kalau tidak, app crash saat start).
-        if (crashHandlerEnabled || !usingDefaultApplicationClass || userHasOwnApplicationFile) {
+                + "/.sketchware/data/" + c.sc_id + "/files/java/"
+                + normalizedApplicationClassName.substring(1).replace('.', '/') + ".java").exists();
+        // Tanpa crash handler, application class tidak dibuat. Jadi android:name hanya ditulis kalau
+        // pengguna punya file class itu sendiri (kalau tidak, app crash saat start).
+        if (crashHandlerEnabled || userHasOwnApplicationFile) {
             applicationTag.addAttribute("android", "name", applicationClassName);
         }
         if (addRequestLegacyExternalStorage) {

@@ -353,9 +353,7 @@ public class yq {
     /**
      * Generates DebugActivity.java, SketchApplication.java, and SketchLogger.java, if necessary.
      *
-     * PATCH: DebugActivity.java and the crash handler in SketchApplication.java are now only
-     * generated when logcat is enabled (debug build + enable_logcat). Otherwise SketchApplication
-     * is a plain Application (kept because the manifest most likely references it).
+     * PATCH: when logcat is OFF (or not a debug build), none of these files are generated.
      */
     public void generateDebugFiles(Context context) {
         boolean logcatEnabled = N.isDebugBuild && new BuildSettings(sc_id).getValue(
@@ -398,41 +396,16 @@ public class yq {
         File targetApplicationFile = new File(javaDir + File.separator +
                 customApplicationClassName.substring(1).replace('.', '/') + ".java");
 
-        // SketchApplication default hanya dibuat saat crash handler/logcat ON. Kalau OFF dan memakai
-        // class default, tidak dibuat sama sekali (Ix.java juga tidak menulis android:name).
-        // Kalau project memakai custom application class, tetap dibuat karena manifest merujuknya.
-        boolean generateApplicationFile = crashHandlerEnabled || !notUsingCustomApplicationClass;
-
-        if (generateApplicationFile && !targetApplicationFile.exists()) {
+        // Application class hanya dibuat saat crash handler/logcat ON. Saat OFF tidak ada file
+        // yang dibuat (default maupun custom); Ix.java juga tidak menulis android:name
+        // kecuali pengguna punya file class itu sendiri di Java Manager.
+        if (crashHandlerEnabled && !targetApplicationFile.exists()) {
             boolean applyMultiDex = projectSettings.getMinSdkVersion() < 21;
             String sketchApplicationFileContent = fileUtil.b(
                     context,
                     "debug" + File.separator + "SketchApplication.java"
             );
             sketchApplicationFileContent = PACKAGE_PLACEHOLDER_PATTERN.matcher(sketchApplicationFileContent).replaceAll(packageName);
-
-            if (!crashHandlerEnabled) {
-                // Application polos tanpa uncaught exception handler.
-                // Anchor yang dipakai replace di bawah tetap ada:
-                // "import android.util.Log;", "mApplicationContext = getApplicationContext();",
-                // "super.onCreate();", dan "Application {".
-                sketchApplicationFileContent =
-                        "package " + packageName + ";\n\n" +
-                                "import android.app.Application;\n" +
-                                "import android.content.Context;\n" +
-                                "import android.util.Log;\n\n" +
-                                "public class SketchApplication extends Application {\n\n" +
-                                "    private static Context mApplicationContext;\n\n" +
-                                "    public static Context getContext() {\n" +
-                                "        return mApplicationContext;\n" +
-                                "    }\n\n" +
-                                "    @Override\n" +
-                                "    public void onCreate() {\n" +
-                                "        mApplicationContext = getApplicationContext();\n" +
-                                "        super.onCreate();\n" +
-                                "    }\n" +
-                                "}\n";
-            }
 
             if (applyMultiDex) {
                 sketchApplicationFileContent = sketchApplicationFileContent.replaceAll(
@@ -1000,6 +973,16 @@ public class yq {
         return CommandBlock.applyCommands("colors.xml", colorsFileBuilder.toCode());
     }
 
+    /**
+     * Whether DebugActivity and the crash handler in SketchApplication are included in the build.
+     * Must match the same rule in Ix (manifest) and generateDebugFiles().
+     */
+    private boolean isCrashHandlerEnabled() {
+        return N.isDebugBuild && new BuildSettings(sc_id).getValue(
+                        BuildSettings.SETTING_ENABLE_LOGCAT, BuildSettings.SETTING_GENERIC_VALUE_TRUE)
+                .equals(BuildSettings.SETTING_GENERIC_VALUE_TRUE);
+    }
+
     public String getXMLStyle() {
         String filePath = wq.b(sc_id) + "/files/resource/values/styles.xml";
         if (FileUtil.isExistFile(filePath) && exportingType == ExportType.SOURCE_CODE_VIEWING) {
@@ -1016,9 +999,11 @@ public class yq {
             stylesFileBuilder.addItemToStyle("AppTheme.FullScreen", "android:windowContentOverlay", "@null");
             stylesFileBuilder.addStyle("AppTheme.AppBarOverlay", "ThemeOverlay.Material3");
             stylesFileBuilder.addStyle("AppTheme.PopupOverlay", "ThemeOverlay.Material3");
-            stylesFileBuilder.addStyle("AppTheme.DebugActivity", "AppTheme");
-            stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "windowActionBar", "true");
-            stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "windowNoTitle", "false");
+            if (isCrashHandlerEnabled()) {
+                stylesFileBuilder.addStyle("AppTheme.DebugActivity", "AppTheme");
+                stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "windowActionBar", "true");
+                stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "windowNoTitle", "false");
+            }
             return CommandBlock.applyCommands("styles.xml", stylesFileBuilder.toCode());
         } else if (N.g) {
             boolean useNewMaterialComponentsTheme = projectSettings.getValue(ProjectSettings.SETTING_ENABLE_BRIDGELESS_THEMES,
@@ -1040,11 +1025,13 @@ public class yq {
             stylesFileBuilder.addStyle("AppTheme.AppBarOverlay", "ThemeOverlay.MaterialComponents.Dark.ActionBar");
             stylesFileBuilder.addStyle("AppTheme.PopupOverlay", "ThemeOverlay.MaterialComponents.Light");
 
-            stylesFileBuilder.addStyle("AppTheme.DebugActivity", "AppTheme");
-            stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "actionBarStyle", "@style/ThemeOverlay.MaterialComponents.ActionBar.Primary");
-            stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "actionBarTheme", "@style/Widget.MaterialComponents.ActionBar.Primary");
-            stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "windowActionBar", "true");
-            stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "windowNoTitle", "false");
+            if (isCrashHandlerEnabled()) {
+                stylesFileBuilder.addStyle("AppTheme.DebugActivity", "AppTheme");
+                stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "actionBarStyle", "@style/ThemeOverlay.MaterialComponents.ActionBar.Primary");
+                stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "actionBarTheme", "@style/Widget.MaterialComponents.ActionBar.Primary");
+                stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "windowActionBar", "true");
+                stylesFileBuilder.addItemToStyle("AppTheme.DebugActivity", "windowNoTitle", "false");
+            }
             return CommandBlock.applyCommands("styles.xml", stylesFileBuilder.toCode());
         } else {
             XmlBuilderHelper stylesFileBuilder = new XmlBuilderHelper();
@@ -1068,7 +1055,9 @@ public class yq {
             stylesFileBuilder.addItemToStyle("NoActionBar", "android:colorControlNormal", "@color/colorControlNormal");
             stylesFileBuilder.addStyle("NoStatusBar", "AppTheme");
             stylesFileBuilder.addItemToStyle("NoStatusBar", "android:windowFullscreen", "true");
-            stylesFileBuilder.addStyle("AppTheme.DebugActivity", "AppTheme");
+            if (isCrashHandlerEnabled()) {
+                stylesFileBuilder.addStyle("AppTheme.DebugActivity", "AppTheme");
+            }
             return CommandBlock.applyCommands("styles.xml", stylesFileBuilder.toCode());
         }
     }
