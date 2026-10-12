@@ -3,6 +3,7 @@ package com.besome.sketch.projects;
 import static mod.hey.studios.util.ProjectFile.getDefaultColor;
 
 import android.graphics.Color;
+import android.os.Build;
 
 import java.util.Random;
 
@@ -30,46 +31,57 @@ public class ThemeManager {
         }
     }
 
-    private static final ThemePreset[] THEME_PRESETS = {
+    private static ThemePreset[] buildThemePresets() {
+        final int accent = getSystemAccent();
+        return new ThemePreset[]{
             new ThemePreset("Material Purple",
-                    0xFF03DAC5, 0xFF6200EE, 0xFF3700B3, 0xFFE8EAF6, 0xFFBDBDBD),
+                    accent, 0xFF6200EE, 0xFF3700B3, 0xFFE8EAF6, 0xFFBDBDBD),
 
             new ThemePreset("Material Blue",
-                    0xFF03DAC5, 0xFF1976D2, 0xFF0D47A1, 0xFFE3F2FD, 0xFFBDBDBD),
+                    accent, 0xFF1976D2, 0xFF0D47A1, 0xFFE3F2FD, 0xFFBDBDBD),
 
             new ThemePreset("Material Green",
-                    0xFF03DAC5, 0xFF388E3C, 0xFF1B5E20, 0xFFE8F5E8, 0xFFBDBDBD),
+                    accent, 0xFF388E3C, 0xFF1B5E20, 0xFFE8F5E8, 0xFFBDBDBD),
 
             new ThemePreset("Material Red",
-                    0xFF03DAC5, 0xFFD32F2F, 0xFFB71C1C, 0xFFFFEBEE, 0xFFBDBDBD),
+                    accent, 0xFFD32F2F, 0xFFB71C1C, 0xFFFFEBEE, 0xFFBDBDBD),
 
             new ThemePreset("Material Orange",
-                    0xFF03DAC5, 0xFFF57C00, 0xFFE65100, 0xFFFFF3E0, 0xFFBDBDBD),
+                    accent, 0xFFF57C00, 0xFFE65100, 0xFFFFF3E0, 0xFFBDBDBD),
 
             new ThemePreset("Material Teal",
-                    0xFF03DAC5, 0xFF00796B, 0xFF004D40, 0xFFE0F2F1, 0xFFBDBDBD),
+                    accent, 0xFF00796B, 0xFF004D40, 0xFFE0F2F1, 0xFFBDBDBD),
 
             new ThemePreset("Material Indigo",
-                    0xFF03DAC5, 0xFF3F51B5, 0xFF1A237E, 0xFFE8EAF6, 0xFFBDBDBD),
+                    accent, 0xFF3F51B5, 0xFF1A237E, 0xFFE8EAF6, 0xFFBDBDBD),
 
             new ThemePreset("Material Pink",
-                    0xFF03DAC5, 0xFFC2185B, 0xFF880E4F, 0xFFFCE4EC, 0xFFBDBDBD),
+                    accent, 0xFFC2185B, 0xFF880E4F, 0xFFFCE4EC, 0xFFBDBDBD),
 
             new ThemePreset("Dark Purple",
-                    0xFF03DAC5, 0xFFBB86FC, 0xFF3700B3, 0xFF1F1F1F, 0xFF666666),
+                    accent, 0xFFBB86FC, 0xFF3700B3, 0xFF1F1F1F, 0xFF666666),
 
             new ThemePreset("Dark Blue",
-                    0xFF03DAC5, 0xFF64B5F6, 0xFF1976D2, 0xFF1F1F1F, 0xFF666666),
+                    accent, 0xFF64B5F6, 0xFF1976D2, 0xFF1F1F1F, 0xFF666666),
 
             new ThemePreset("Light Purple",
-                    0xFF03DAC5, 0xFF6200EE, 0xFF3700B3, 0xFFF3E5F5, 0xFFE1BEE7),
+                    accent, 0xFF6200EE, 0xFF3700B3, 0xFFF3E5F5, 0xFFE1BEE7),
 
             new ThemePreset("Light Blue",
-                    0xFF03DAC5, 0xFF1976D2, 0xFF0D47A1, 0xFFE3F2FD, 0xFFBBDEFB)
-    };
+                    accent, 0xFF1976D2, 0xFF0D47A1, 0xFFE3F2FD, 0xFFBBDEFB)
+        };
+    }
+
+    /** Accent follows the system color on Android 12+, else the old Material teal. */
+    private static int getSystemAccent() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return getDefaultColor(ProjectFile.COLOR_ACCENT);
+        }
+        return 0xFF03DAC5;
+    }
 
     public static ThemePreset[] getThemePresets() {
-        return THEME_PRESETS;
+        return buildThemePresets();
     }
 
     public static ThemePreset generateRandomTheme() {

@@ -18,6 +18,7 @@ import android.widget.NumberPicker;
 import android.widget.TextView;
 
 import androidx.core.content.FileProvider;
+import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.transition.AutoTransition;
 import androidx.transition.TransitionManager;
@@ -207,8 +208,8 @@ public class MyProjectSettingActivity extends BaseAppCompatActivity implements V
         }
 
         if (requestCode == REQUEST_CODE_CREATE_ICON && resultCode == RESULT_OK) {
-            if (data.getParcelableExtra("appIco") != null) {
-                icon = data.getParcelableExtra("appIco");
+            if (IntentCompat.getParcelableExtra(data, "appIco", Bitmap.class) != null) {
+                icon = IntentCompat.getParcelableExtra(data, "appIco", Bitmap.class);
 
                 isIconAdaptive = data.getBooleanExtra("isIconAdaptive", false);
                 binding.appIcon.setImageBitmap(icon);
@@ -590,7 +591,11 @@ public class MyProjectSettingActivity extends BaseAppCompatActivity implements V
                 String xmlContent = FileUtil.readFile(colorsFilePath);
                 for (int i = 0; i < themeColorKeys.length; i++) {
                     String colorName = themeColorLabels[i];
-                    String newColor = String.format("#%06X", (0xFFFFFF & projectThemeColors[i]));
+                    int themeColor = projectThemeColors[i];
+                    // Keep alpha when the color isn't fully opaque
+                    String newColor = Color.alpha(themeColor) == 0xFF
+                            ? String.format("#%06X", 0xFFFFFF & themeColor)
+                            : String.format("#%08X", themeColor);
                     xmlContent = xmlContent.replaceAll("(<color\\s+name=\"" + colorName + "\">)(.*?)(</color>)", "$1" + newColor + "$3");
                 }
                 FileUtil.writeFile(colorsFilePath, xmlContent);
