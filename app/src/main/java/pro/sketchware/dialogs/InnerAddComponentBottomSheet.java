@@ -10,6 +10,7 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.os.BundleCompat;
 
 import com.besome.sketch.beans.ComponentBean;
 import com.besome.sketch.beans.ProjectFileBean;
@@ -65,8 +66,8 @@ public class InnerAddComponentBottomSheet extends BottomSheetDialogFragment {
 
         Bundle args = getArguments();
         scId = args.getString("sc_id");
-        componentBean = args.getParcelable("component_bean");
-        projectFileBean = args.getParcelable("project_file_bean");
+        componentBean = BundleCompat.getParcelable(args, "component_bean", ComponentBean.class);
+        projectFileBean = BundleCompat.getParcelable(args, "project_file_bean", ProjectFileBean.class);
     }
 
     @Override
