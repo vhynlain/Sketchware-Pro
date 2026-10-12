@@ -2840,10 +2840,12 @@ public class Lx {
                     public static int CENTER = 2;
                     public static int BOTTOM = 3;
                 
+                    @SuppressWarnings("deprecation")
                     public static void CustomToast(Context _context, String _message, int _textColor, int _textSize, int _bgColor, int _radius, int _gravity) {
-                        Toast _toast = Toast.makeText(_context, _message, Toast.LENGTH_SHORT);
-                        View _view = _toast.getView();
-                        TextView _textView = _view.findViewById(android.R.id.message);
+                        Toast _toast = new Toast(_context);
+                        _toast.setDuration(Toast.LENGTH_SHORT);
+                        TextView _textView = new TextView(_context);
+                        _textView.setText(_message);
                         _textView.setTextSize(_textSize);
                         _textView.setTextColor(_textColor);
                         _textView.setGravity(Gravity.CENTER);
@@ -2851,9 +2853,10 @@ public class Lx {
                         GradientDrawable _gradientDrawable = new GradientDrawable();
                         _gradientDrawable.setColor(_bgColor);
                         _gradientDrawable.setCornerRadius(_radius);
-                        _view.setBackground(_gradientDrawable);
-                        _view.setPadding(15, 10, 15, 10);
-                        _view.setElevation(10);
+                        _textView.setBackground(_gradientDrawable);
+                        _textView.setPadding(15, 10, 15, 10);
+                        _textView.setElevation(10);
+                        _toast.setView(_textView);
                 
                         switch (_gravity) {
                             case 1:
@@ -2871,10 +2874,12 @@ public class Lx {
                         _toast.show();
                     }
                 
+                    @SuppressWarnings("deprecation")
                     public static void CustomToastWithIcon(Context _context, String _message, int _textColor, int _textSize, int _bgColor, int _radius, int _gravity, int _icon) {
-                        Toast _toast = Toast.makeText(_context, _message, Toast.LENGTH_SHORT);
-                        View _view = _toast.getView();
-                        TextView _textView = (TextView) _view.findViewById(android.R.id.message);
+                        Toast _toast = new Toast(_context);
+                        _toast.setDuration(Toast.LENGTH_SHORT);
+                        TextView _textView = new TextView(_context);
+                        _textView.setText(_message);
                         _textView.setTextSize(_textSize);
                         _textView.setTextColor(_textColor);
                         _textView.setCompoundDrawablesWithIntrinsicBounds(_icon, 0, 0, 0);
@@ -2884,9 +2889,10 @@ public class Lx {
                         GradientDrawable _gradientDrawable = new GradientDrawable();
                         _gradientDrawable.setColor(_bgColor);
                         _gradientDrawable.setCornerRadius(_radius);
-                        _view.setBackground(_gradientDrawable);
-                        _view.setPadding(10, 10, 10, 10);
-                        _view.setElevation(10);
+                        _textView.setBackground(_gradientDrawable);
+                        _textView.setPadding(10, 10, 10, 10);
+                        _textView.setElevation(10);
+                        _toast.setView(_textView);
                 
                         switch (_gravity) {
                             case 1:
@@ -2944,8 +2950,16 @@ public class Lx {
                         }
                     }
                 
+                    @SuppressWarnings("deprecation")
                     public static boolean isConnected(Context _context) {
                         ConnectivityManager _connectivityManager = (ConnectivityManager) _context.getSystemService(Context.CONNECTIVITY_SERVICE);
+                        if (_connectivityManager == null) return false;
+                        if (android.os.Build.VERSION.SDK_INT >= 23) {
+                            Network _activeNetwork = _connectivityManager.getActiveNetwork();
+                            if (_activeNetwork == null) return false;
+                            NetworkCapabilities _capabilities = _connectivityManager.getNetworkCapabilities(_activeNetwork);
+                            return _capabilities != null && _capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+                        }
                         NetworkInfo _activeNetworkInfo = _connectivityManager.getActiveNetworkInfo();
                         return _activeNetworkInfo != null && _activeNetworkInfo.isConnected();
                     }
@@ -2966,14 +2980,31 @@ public class Lx {
                         return _outputStream.toString();
                     }
                 
+                    @SuppressWarnings("deprecation")
                     public static void hideKeyboard(Context _context) {
                         InputMethodManager _inputMethodManager = (InputMethodManager) _context.getSystemService(Context.INPUT_METHOD_SERVICE);
-                        _inputMethodManager.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0);
+                        if (_context instanceof Activity) {
+                            Activity _activity = (Activity) _context;
+                            View _focus = _activity.getCurrentFocus();
+                            if (_focus == null) _focus = _activity.getWindow().getDecorView();
+                            _inputMethodManager.hideSoftInputFromWindow(_focus.getWindowToken(), 0);
+                        } else {
+                            _inputMethodManager.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0);
+                        }
                     }
                 
+                    @SuppressWarnings("deprecation")
                     public static void showKeyboard(Context _context) {
                         InputMethodManager _inputMethodManager = (InputMethodManager) _context.getSystemService(Context.INPUT_METHOD_SERVICE);
-                        _inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+                        if (_context instanceof Activity) {
+                            Activity _activity = (Activity) _context;
+                            View _focus = _activity.getCurrentFocus();
+                            if (_focus == null) _focus = _activity.getWindow().getDecorView();
+                            _focus.requestFocus();
+                            _inputMethodManager.showSoftInput(_focus, InputMethodManager.SHOW_IMPLICIT);
+                        } else {
+                            _inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+                        }
                     }
                 
                     public static void showMessage(Context _context, String _s) {
