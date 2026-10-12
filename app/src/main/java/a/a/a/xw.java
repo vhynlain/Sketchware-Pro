@@ -7,6 +7,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -199,7 +200,7 @@ public class xw extends qA {
                 jC.a(g).a(var4, var6);
             }
 
-            ArrayList<ViewBean> var8 = a(((ProjectFileBean) var3.getParcelableExtra("preset_data")).presetName, var1);
+            ArrayList<ViewBean> var8 = a(IntentCompat.getParcelableExtra(var3, "preset_data", ProjectFileBean.class).presetName, var1);
             jC.a(g);
 
             for (ViewBean viewBean : eC.a(var8)) {

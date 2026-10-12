@@ -14,6 +14,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -104,14 +105,14 @@ public class ow extends qA {
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 269 && resultCode == Activity.RESULT_OK) {
-            sounds.add(data.getParcelableExtra("project_resource"));
+            sounds.add(IntentCompat.getParcelableExtra(data, "project_resource", ProjectResourceBean.class));
             SketchwareUtil.toast(Helper.getResString(R.string.design_manager_message_add_complete));
 
             adapter.notifyDataSetChanged();
             updateNoSoundsTextVisibility();
             ((ManageSoundActivity) requireActivity()).collectionSounds.loadProjectSounds();
         } else if (requestCode == 270 && resultCode == Activity.RESULT_OK) {
-            sounds.set(adapter.lastSelectedSound, data.getParcelableExtra("project_resource"));
+            sounds.set(adapter.lastSelectedSound, IntentCompat.getParcelableExtra(data, "project_resource", ProjectResourceBean.class));
             SketchwareUtil.toast(Helper.getResString(R.string.design_manager_message_edit_complete));
             adapter.notifyDataSetChanged();
             updateNoSoundsTextVisibility();

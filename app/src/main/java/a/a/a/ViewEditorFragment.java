@@ -13,6 +13,7 @@ import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.IntentCompat;
 
 import com.besome.sketch.beans.HistoryViewBean;
 import com.besome.sketch.beans.ProjectFileBean;
@@ -492,7 +493,7 @@ public class ViewEditorFragment extends qA {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 213) {
             if (resultCode == -1) {
-                c(data.getParcelableExtra("bean"));
+                c(IntentCompat.getParcelableExtra(data, "bean", ViewBean.class));
             }
 
             if (data != null && data.getBooleanExtra("is_edit_image", false)) {

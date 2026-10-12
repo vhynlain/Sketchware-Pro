@@ -11,6 +11,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -204,11 +205,11 @@ public class Fw extends qA {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_CODE_ADD_VIEW_ACTIVITY) {
             if (resultCode == Activity.RESULT_OK) {
-                b(data.getParcelableExtra("project_file"));
+                b(IntentCompat.getParcelableExtra(data, "project_file", ProjectFileBean.class));
                 projectFilesAdapter.notifyItemChanged(projectFilesAdapter.layoutPosition);
             }
         } else if (requestCode == REQUEST_CODE_PRESET_ACTIVITY && resultCode == Activity.RESULT_OK) {
-            ProjectFileBean projectFileBean = data.getParcelableExtra("preset_data");
+            ProjectFileBean projectFileBean = IntentCompat.getParcelableExtra(data, "preset_data", ProjectFileBean.class);
             b(projectFileBean);
             c(projectFileBean);
             projectFilesAdapter.notifyItemChanged(projectFilesAdapter.layoutPosition);

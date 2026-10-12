@@ -72,6 +72,7 @@ import mod.pranav.build.R8Compiler;
 import mod.pranav.viewbinding.ViewBindingBuilder;
 import pro.sketchware.SketchApplication;
 import pro.sketchware.util.library.BuiltInLibraryManager;
+import pro.sketchware.utility.ApiCompat;
 import pro.sketchware.utility.FilePathUtil;
 import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
@@ -113,11 +114,11 @@ public class ProjectBuilder {
         SystemLogPrinter.start();
 
         try {
-            PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            PackageInfo info = ApiCompat.getPackageInfo(context.getPackageManager(), context.getPackageName(), 0);
 
             LogUtil.d(TAG, "Running Sketchware Pro " + info.versionName + " (" + info.versionCode + ")");
 
-            ApplicationInfo applicationInfo = context.getPackageManager().getApplicationInfo(context.getPackageName(), 0);
+            ApplicationInfo applicationInfo = ApiCompat.getApplicationInfo(context.getPackageManager(), context.getPackageName(), 0);
 
             long fileSizeInBytes = new File(applicationInfo.sourceDir).length();
             LogUtil.d(TAG, "base.apk's size is " + Formatter.formatFileSize(context, fileSizeInBytes) + " (" + fileSizeInBytes + " B)");

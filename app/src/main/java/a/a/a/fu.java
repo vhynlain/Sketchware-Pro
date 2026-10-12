@@ -3,7 +3,6 @@ package a.a.a;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,6 +13,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -37,11 +37,7 @@ public class fu extends qA implements View.OnClickListener {
         var data = result.getData();
         if (result.getResultCode() == Activity.RESULT_OK && data != null) {
             ArrayList<ProjectResourceBean> importedImages;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                importedImages = data.getParcelableArrayListExtra("results", ProjectResourceBean.class);
-            } else {
-                importedImages = data.getParcelableArrayListExtra("results");
-            }
+            importedImages = IntentCompat.getParcelableArrayListExtra(data, "results", ProjectResourceBean.class);
             ArrayList<ProjectResourceBean> newImportedImages = new ArrayList<>();
             for (ProjectResourceBean image : importedImages) {
                 newImportedImages.add(new ProjectResourceBean(ProjectResourceBean.PROJECT_RES_TYPE_FILE, image.resName, image.resFullName));

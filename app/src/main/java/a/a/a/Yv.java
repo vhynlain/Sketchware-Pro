@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,6 +15,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.besome.sketch.beans.ProjectResourceBean;
@@ -70,7 +72,7 @@ public class Yv extends qA {
 
         importSoundsHandler = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
-                handleImportedSounds(result.getData().getParcelableArrayListExtra("results"));
+                handleImportedSounds(IntentCompat.getParcelableArrayListExtra(result.getData(), "results", ProjectResourceBean.class));
             }
         });
     }
@@ -230,7 +232,7 @@ public class Yv extends qA {
                     int position = getLayoutPosition();
                     sounds.get(position).isSelected = isChecked;
                     updateImportSoundsText();
-                    new Handler().post(() -> notifyItemChanged(position));
+                    new Handler(Looper.getMainLooper()).post(() -> notifyItemChanged(position));
                 });
             }
 

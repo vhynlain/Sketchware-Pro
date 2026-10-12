@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.PorterDuff;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -19,6 +18,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -90,11 +90,7 @@ public class pu extends qA {
         if (result.getResultCode() == Activity.RESULT_OK) {
             assert result.getData() != null;
             ArrayList<ProjectResourceBean> addedImages;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                addedImages = result.getData().getParcelableArrayListExtra("images", ProjectResourceBean.class);
-            } else {
-                addedImages = result.getData().getParcelableArrayListExtra("images");
-            }
+            addedImages = IntentCompat.getParcelableArrayListExtra(result.getData(), "images", ProjectResourceBean.class);
             images.addAll(addedImages);
             adapter.notifyItemRangeInserted(images.size() - addedImages.size(), addedImages.size());
             updateGuideVisibility();
@@ -106,11 +102,7 @@ public class pu extends qA {
         if (result.getResultCode() == Activity.RESULT_OK) {
             assert result.getData() != null;
             ProjectResourceBean editedImage;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                editedImage = result.getData().getParcelableExtra("image", ProjectResourceBean.class);
-            } else {
-                editedImage = result.getData().getParcelableExtra("image");
-            }
+            editedImage = IntentCompat.getParcelableExtra(result.getData(), "image", ProjectResourceBean.class);
             kC.z();
             for (ProjectResourceBean image : images) {
                 if (image.resName.equals(editedImage.resName)) {
