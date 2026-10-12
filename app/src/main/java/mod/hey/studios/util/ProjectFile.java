@@ -1,8 +1,10 @@
 package mod.hey.studios.util;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
+import android.content.res.TypedArray;
 import android.graphics.Color;
-import android.os.Build;
+import android.view.ContextThemeWrapper;
 
 import a.a.a.lC;
 import a.a.a.yB;
@@ -42,32 +44,32 @@ public class ProjectFile {
 	*/
 
     public static int getDefaultColor(String color) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Android 12+ (API 31): follow the system dynamic (Material You) colors
-            Context context = SketchApplication.getContext();
-            return switch (color) {
-                case COLOR_PRIMARY ->
-                        context.getColor(android.R.color.system_accent1_600);
-                case COLOR_PRIMARY_DARK ->
-                        context.getColor(android.R.color.system_accent1_700);
-                case COLOR_ACCENT ->
-                        context.getColor(android.R.color.system_accent2_500);
-                case COLOR_CONTROL_HIGHLIGHT ->
-                        context.getColor(android.R.color.system_accent1_100);
-                case COLOR_CONTROL_NORMAL ->
-                        context.getColor(android.R.color.system_neutral2_500);
-                default -> context.getColor(android.R.color.system_accent1_500);
-            };
-        } else {
-            // Below Android 12: static fallback colors
-            return switch (color) {
-                case COLOR_PRIMARY -> Color.parseColor("#ff2196f3");
-                case COLOR_PRIMARY_DARK -> Color.parseColor("#ff1976d2");
-                case COLOR_ACCENT -> Color.parseColor("#ff2196f3");
-                case COLOR_CONTROL_HIGHLIGHT -> Color.parseColor("#202196f3");
-                case COLOR_CONTROL_NORMAL -> Color.parseColor("#ff757575");
-                default -> Color.parseColor("#ff2196f3");
-            };
+        // Default = the Android system's own theme colors (Theme.DeviceDefault),
+        // resolved straight from the system theme instead of being picked by Sketchware.
+        return switch (color) {
+            case COLOR_PRIMARY -> getSystemColor(android.R.attr.colorPrimary, "#ff2196f3");
+            case COLOR_PRIMARY_DARK -> getSystemColor(android.R.attr.colorPrimaryDark, "#ff1976d2");
+            case COLOR_ACCENT -> getSystemColor(android.R.attr.colorAccent, "#ff2196f3");
+            case COLOR_CONTROL_HIGHLIGHT -> getSystemColor(android.R.attr.colorControlHighlight, "#202196f3");
+            case COLOR_CONTROL_NORMAL -> getSystemColor(android.R.attr.colorControlNormal, "#ff757575");
+            default -> getSystemColor(android.R.attr.colorPrimary, "#ff2196f3");
+        };
+    }
+
+    private static int getSystemColor(int attr, String fallback) {
+        try {
+            Context themed = new ContextThemeWrapper(SketchApplication.getContext(), android.R.style.Theme_DeviceDefault_Light);
+            TypedArray a = themed.obtainStyledAttributes(new int[]{attr});
+            try {
+                ColorStateList colors = a.getColorStateList(0);
+                if (colors != null) {
+                    return colors.getDefaultColor();
+                }
+            } finally {
+                a.recycle();
+            }
+        } catch (Exception ignored) {
         }
+        return Color.parseColor(fallback);
     }
 }
