@@ -36,6 +36,7 @@ import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.core.content.IntentCompat;
 import androidx.core.view.GravityCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -186,7 +187,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     public final ActivityResultLauncher<Intent> changeOpenFile = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         if (result.getResultCode() == Activity.RESULT_OK) {
             assert result.getData() != null;
-            projectFile = result.getData().getParcelableExtra("project_file");
+            projectFile = IntentCompat.getParcelableExtra(result.getData(), "project_file", ProjectFileBean.class);
             refresh();
         }
     });
