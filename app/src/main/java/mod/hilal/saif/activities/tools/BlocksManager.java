@@ -53,6 +53,7 @@ import pro.sketchware.databinding.ActivityBlocksManagerBinding;
 import pro.sketchware.databinding.DialogBlockConfigurationBinding;
 import pro.sketchware.databinding.DialogPaletteBinding;
 import pro.sketchware.databinding.PalletCustomviewBinding;
+import pro.sketchware.utility.ApiCompat;
 import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.PropertiesUtil;
 import pro.sketchware.utility.SketchwareUtil;
@@ -77,7 +78,7 @@ public class BlocksManager extends BaseAppCompatActivity {
     public void onCreate(Bundle _savedInstanceState) {
         super.onCreate(_savedInstanceState);
         binding = ActivityBlocksManagerBinding.inflate(getLayoutInflater());
-        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        vibrator = ApiCompat.getVibrator(this);
 
         setContentView(binding.getRoot());
 
@@ -162,7 +163,7 @@ public class BlocksManager extends BaseAppCompatActivity {
                         int pos = viewHolder.getBindingAdapterPosition();
                         binding.recycleBinCard.setAlpha(0.5f);
                         if (!isCurrentlyActive && pos != RecyclerView.NO_POSITION && pos < pallet_listmap.size() && !isDialogShowing) {
-                            vibrator.vibrate(40L);
+                            ApiCompat.vibrate(vibrator, 40L);
                             showMoveToBinDialog(pos);
                             isDialogShowing = true;
                         }
