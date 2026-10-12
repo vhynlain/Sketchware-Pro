@@ -67,7 +67,7 @@ public class BaseBottomSheetDialogActivity extends BaseAppCompatActivity {
             public void onStateChanged(@NonNull View view, int newState) {
                 if (newState == BottomSheetBehavior.STATE_HIDDEN) {
                     BaseBottomSheetDialogActivity.super.finish();
-                    ApiCompat.overrideTransition(this, false, 0, R.anim.design_bottom_sheet_slide_out);
+                    ApiCompat.overrideTransition(BaseBottomSheetDialogActivity.this, false, 0, R.anim.design_bottom_sheet_slide_out);
                 }
             }
 
