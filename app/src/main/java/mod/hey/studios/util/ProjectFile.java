@@ -44,7 +44,7 @@ public class ProjectFile {
 	*/
 
     public static int getDefaultColor(String color) {
-        // Default = the Android system's own theme colors (Theme.DeviceDefault),
+        // Default = the Android system's own theme colors (Theme.Material.Light.DarkActionBar, same parent as AppTheme),
         // resolved straight from the system theme instead of being picked by Sketchware.
         return switch (color) {
             case COLOR_PRIMARY -> getSystemColor(android.R.attr.colorPrimary, "#ff2196f3");
@@ -58,7 +58,7 @@ public class ProjectFile {
 
     private static int getSystemColor(int attr, String fallback) {
         try {
-            Context themed = new ContextThemeWrapper(SketchApplication.getContext(), android.R.style.Theme_DeviceDefault_Light);
+            Context themed = new ContextThemeWrapper(SketchApplication.getContext(), android.R.style.Theme_Material_Light_DarkActionBar);
             TypedArray a = themed.obtainStyledAttributes(new int[]{attr});
             try {
                 ColorStateList colors = a.getColorStateList(0);
