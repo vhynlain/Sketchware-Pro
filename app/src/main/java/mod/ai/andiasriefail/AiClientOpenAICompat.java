@@ -268,7 +268,7 @@ public final class AiClientOpenAICompat {
                     return;
                 }
                 lastErr = new AiClient.AiException("Gagal terhubung ke " + providerName + ": " + msgOf(e));
-                sleepBackoff(attempt);
+                try { sleepBackoff(attempt); } catch (AiClient.AiException ex) { callback.onError(ex.getMessage(), ex.cancelled); return; }
             } catch (Throwable t) {
                 callback.onError("Kesalahan tak terduga " + providerName + ": " + t.getMessage(), false);
                 return;

@@ -242,7 +242,7 @@ public final class AiClientGemini {
                     return;
                 }
                 lastErr = new AiClient.AiException("Gagal terhubung ke Gemini: " + msgOf(e));
-                sleepBackoff(attempt);
+                try { sleepBackoff(attempt); } catch (AiClient.AiException ex) { callback.onError(ex.getMessage(), ex.cancelled); return; }
             } catch (Throwable t) {
                 callback.onError("Kesalahan tak terduga Gemini: " + t.getMessage(), false);
                 return;
