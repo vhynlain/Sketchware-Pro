@@ -16,6 +16,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Parcelable;
 import android.os.Vibrator;
 import android.text.Editable;
@@ -46,6 +47,8 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.FileProvider;
+import androidx.core.content.IntentCompat;
+import androidx.core.os.BundleCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -140,6 +143,7 @@ import pro.sketchware.databinding.PropertyPopupSelectorSingleBinding;
 import pro.sketchware.databinding.SearchWithRecyclerViewBinding;
 import pro.sketchware.lib.base.BaseTextWatcher;
 import pro.sketchware.menu.ExtraMenuBean;
+import pro.sketchware.utility.ApiCompat;
 import pro.sketchware.utility.FilePathUtil;
 import pro.sketchware.utility.SvgUtils;
 
@@ -147,7 +151,7 @@ import pro.sketchware.utility.SvgUtils;
 public class LogicEditorActivity extends BaseAppCompatActivity implements View.OnClickListener, Vs, View.OnTouchListener, MoreblockImporterDialog.CallBack {
 
     public LogicEditorBinding binding;
-    private final Handler handler = new Handler();
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private final int[] v = new int[2];
     private final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
     public ProjectFileBean M;
@@ -461,7 +465,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
 
     public void L() {
         try {
-            new Handler().postDelayed(() -> new ProjectSaver(this).execute(), 500L);
+            new Handler(Looper.getMainLooper()).postDelayed(() -> new ProjectSaver(this).execute(), 500L);
         } catch (Exception e) {
             crashlytics.recordException(e);
         }
@@ -1934,12 +1938,12 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             scId = getIntent().getStringExtra("sc_id");
             id = getIntent().getStringExtra("id");
             eventName = getIntent().getStringExtra("event");
-            parcelable = getIntent().getParcelableExtra("project_file");
+            parcelable = IntentCompat.getParcelableExtra(getIntent(), "project_file", ProjectFileBean.class);
         } else {
             scId = savedInstanceState.getString("sc_id");
             id = savedInstanceState.getString("id");
             eventName = savedInstanceState.getString("event");
-            parcelable = savedInstanceState.getParcelable("project_file");
+            parcelable = BundleCompat.getParcelable(savedInstanceState, "project_file", ProjectFileBean.class);
         }
         isViewBindingEnabled = new ProjectSettings(scId).getValue(ProjectSettings.SETTING_ENABLE_VIEWBINDING, "false").equals("true");
         M = (ProjectFileBean) parcelable;
@@ -1953,7 +1957,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         });
         G = new DB(this, "P12").a("P12I0", true);
         minDist = ViewConfiguration.get(this).getScaledTouchSlop();
-        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        vibrator = ApiCompat.getVibrator(this);
         String eventText = getIntent().getStringExtra("event_text");
         toolbar.setTitle(id.equals("_fab") ? "fab" : ReturnMoreblockManager.getMbName(id));
         toolbar.setSubtitle(eventText);
@@ -2429,7 +2433,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             }
 
             if (G) {
-                vibrator.vibrate(100L);
+                ApiCompat.vibrate(vibrator, 100L);
             }
 
             isDragged = true;

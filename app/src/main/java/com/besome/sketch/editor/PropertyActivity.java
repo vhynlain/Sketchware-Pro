@@ -17,6 +17,8 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.IntentCompat;
+import androidx.core.os.BundleCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.ViewPropertyAnimatorCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -140,7 +142,7 @@ public class PropertyActivity extends BaseAppCompatActivity implements Kw {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 209 && resultCode == -1 && jC.d(sc_id) != null && data != null) {
             String var4 = data.getStringExtra("sc_id");
-            ArrayList<ProjectResourceBean> result = data.getParcelableArrayListExtra("result");
+            ArrayList<ProjectResourceBean> result = IntentCompat.getParcelableArrayListExtra(data, "result", ProjectResourceBean.class);
             if (jC.d(var4) != null) {
                 jC.d(var4).b(result);
                 m();
@@ -189,12 +191,12 @@ public class PropertyActivity extends BaseAppCompatActivity implements Kw {
 
         if (savedInstanceState != null) {
             sc_id = savedInstanceState.getString("sc_id");
-            projectFileBean = savedInstanceState.getParcelable("project_file");
-            viewBean = savedInstanceState.getParcelable("bean");
+            projectFileBean = BundleCompat.getParcelable(savedInstanceState, "project_file", ProjectFileBean.class);
+            viewBean = BundleCompat.getParcelable(savedInstanceState, "bean", ViewBean.class);
         } else {
             sc_id = getIntent().getStringExtra("sc_id");
-            projectFileBean = getIntent().getParcelableExtra("project_file");
-            viewBean = getIntent().getParcelableExtra("bean");
+            projectFileBean = IntentCompat.getParcelableExtra(getIntent(), "project_file", ProjectFileBean.class);
+            viewBean = IntentCompat.getParcelableExtra(getIntent(), "bean", ViewBean.class);
         }
 
         String viewId;
