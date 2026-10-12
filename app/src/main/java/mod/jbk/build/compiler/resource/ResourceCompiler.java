@@ -20,6 +20,7 @@ import mod.jbk.build.BuiltInLibraries;
 import mod.jbk.diagnostic.MissingFileException;
 import mod.jbk.util.LogUtil;
 import pro.sketchware.SketchApplication;
+import pro.sketchware.utility.ApiCompat;
 import pro.sketchware.utility.BinaryExecutor;
 import pro.sketchware.utility.FileUtil;
 
@@ -368,7 +369,7 @@ public class ResourceCompiler {
             if (cachedCompiledResources.exists()) {
                 try {
                     Context context = SketchApplication.getContext();
-                    return context.getPackageManager().getPackageInfo(context.getPackageName(), 0)
+                    return ApiCompat.getPackageInfo(context.getPackageManager(), context.getPackageName(), 0)
                             .lastUpdateTime > cachedCompiledResources.lastModified();
                 } catch (PackageManager.NameNotFoundException e) {
                     LogUtil.e(TAG + ":iBILRN", "Couldn't get package info about ourselves: " + e.getMessage(), e);
