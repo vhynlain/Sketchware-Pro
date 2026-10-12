@@ -14,6 +14,8 @@ import a.a.a.mB;
 import a.a.a.wB;
 import pro.sketchware.R;
 
+import androidx.core.view.WindowCompat;
+
 public class BaseDialogActivity extends BaseAppCompatActivity {
 
     public LinearLayout dialogContainerView;
@@ -34,10 +36,8 @@ public class BaseDialogActivity extends BaseAppCompatActivity {
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.setStatusBarColor(Color.parseColor("#66000000"));
-        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-
-        View decor = getWindow().getDecorView();
-        decor.setSystemUiVisibility(0);
+        // Dark status bar icons off (the old code set LIGHT_STATUS_BAR, then cleared all flags right after)
+        WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightStatusBars(false);
 
         dialogIcon = findViewById(R.id.common_dialog_icon);
         dialogContainerView = findViewById(R.id.common_dialog_container);

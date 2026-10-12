@@ -13,12 +13,14 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import androidx.core.view.WindowCompat;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
 import a.a.a.mB;
 import a.a.a.wB;
 import pro.sketchware.R;
+import pro.sketchware.utility.ApiCompat;
 
 public class BaseBottomSheetDialogActivity extends BaseAppCompatActivity {
 
@@ -41,9 +43,9 @@ public class BaseBottomSheetDialogActivity extends BaseAppCompatActivity {
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.setStatusBarColor(Color.parseColor("#66000000"));
-        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightStatusBars(true);
 
-        overridePendingTransition(R.anim.design_bottom_sheet_slide_in, 0);
+        ApiCompat.overrideTransition(this, true, R.anim.design_bottom_sheet_slide_in, 0);
 
         dialogIcon = findViewById(R.id.common_dialog_icon);
         dialogContainerView = findViewById(R.id.common_dialog_container);
@@ -65,7 +67,7 @@ public class BaseBottomSheetDialogActivity extends BaseAppCompatActivity {
             public void onStateChanged(@NonNull View view, int newState) {
                 if (newState == BottomSheetBehavior.STATE_HIDDEN) {
                     BaseBottomSheetDialogActivity.super.finish();
-                    overridePendingTransition(0, R.anim.design_bottom_sheet_slide_out);
+                    ApiCompat.overrideTransition(this, false, 0, R.anim.design_bottom_sheet_slide_out);
                 }
             }
 
