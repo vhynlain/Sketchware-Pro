@@ -126,7 +126,7 @@ public final class AiClient {
                            AiProvider provider) throws AiException {
         if (provider == null) provider = AiProvider.CLAUDE;
         switch (provider) {
-            case GEMINI:  return geminiClient.send(apiKey, model, system, history);
+            case GEMINI:  return geminiClient.send(apiKey, model, system, history, tools);
             case MISTRAL: return mistralClient.send(apiKey, model, system, history, tools);
             case GROQ:    return groqClient.send(apiKey, model, system, history, tools);
             case GPT:     return openAIClient.send(apiKey, model, system, history, tools);
@@ -177,6 +177,25 @@ public final class AiClient {
     /**
      * Implementasi asli Claude blocking — tidak berubah dari versi sebelumnya.
      */
+    /** Remove provider-specific fields (Gemini thought_signature) that Claude's API would reject. */
+    private static JSONArray stripForeignFields(JSONArray messages) {
+        try {
+            JSONArray copy = new JSONArray(messages.toString());
+            for (int i = 0; i < copy.length(); i++) {
+                JSONObject m = copy.optJSONObject(i);
+                JSONArray c = m == null ? null : m.optJSONArray("content");
+                if (c == null) continue;
+                for (int j = 0; j < c.length(); j++) {
+                    JSONObject b = c.optJSONObject(j);
+                    if (b != null) b.remove("thought_signature");
+                }
+            }
+            return copy;
+        } catch (Throwable t) {
+            return messages;
+        }
+    }
+
     private JSONObject sendClaude(String apiKey, String model, String system,
                                   JSONArray messages, JSONArray tools) throws AiException {
         if (apiKey == null || apiKey.trim().isEmpty()) {
@@ -189,7 +208,7 @@ public final class AiClient {
             json.put("model", model);
             json.put("max_tokens", MAX_TOKENS);
             json.put("system", system);
-            json.put("messages", messages);
+            json.put("messages", stripForeignFields(messages));
             if (tools != null && tools.length() > 0) json.put("tools", tools);
             body = json.toString();
         } catch (Throwable t) {

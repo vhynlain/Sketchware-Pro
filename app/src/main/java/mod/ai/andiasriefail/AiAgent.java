@@ -106,7 +106,7 @@ public final class AiAgent {
         } catch (Throwable t) {
             running.set(false);
             Log.e(TAG, "Failed to start", t);
-            safeError("Gagal memulai: " + t.getMessage());
+            safeError(AiStrings.t(context, "Failed to start: ", "Gagal memulai: ") + t.getMessage());
             return false;
         }
     }
@@ -151,7 +151,7 @@ public final class AiAgent {
                 JSONObject response = client.send(apiKey, model, system, history, tools, provider);
 
                 JSONArray content = response.optJSONArray("content");
-                if (content == null) throw new AiClient.AiException("Balasan kosong dari server");
+                if (content == null) throw new AiClient.AiException(AiStrings.t(context, "Empty reply from the server", "Balasan kosong dari server"));
                 JSONArray updated = copyArray(history);
                 updated.put(new JSONObject().put("role", "assistant").put("content", content));
                 history = updated;
@@ -237,7 +237,7 @@ public final class AiAgent {
             repairHistory();
             note = "error";
             String msg = t.getMessage();
-            safeError("Terjadi kesalahan: " + (msg == null ? t.getClass().getSimpleName() : msg));
+            safeError(AiStrings.t(context, "Something went wrong: ", "Terjadi kesalahan: ") + (msg == null ? t.getClass().getSimpleName() : msg));
         } finally {
             running.set(false);
             try {
@@ -257,7 +257,7 @@ public final class AiAgent {
             AiTool tool = registry.get(name);
             if (tool == null) {
                 safeToolStart(id, name, "");
-                AiTool.Result r = new AiTool.Result(false, "Tool tidak dikenal: " + name);
+                AiTool.Result r = new AiTool.Result(false, AiStrings.t(context, "Unknown tool: ", "Tool tidak dikenal: ") + name);
                 safeToolEnd(id, false, r.text);
                 return r;
             }
@@ -283,7 +283,7 @@ public final class AiAgent {
                     allowed = false;
                 }
                 if (!allowed || stopRequested) {
-                    AiTool.Result r = new AiTool.Result(false, "Pengguna menolak izin atau membatalkan.");
+                    AiTool.Result r = new AiTool.Result(false, AiStrings.t(context, "The user denied permission or cancelled.", "Pengguna menolak izin atau membatalkan."));
                     safeToolEnd(id, false, r.text);
                     return r;
                 }
@@ -446,7 +446,7 @@ public final class AiAgent {
 
     private void safeError(String message) {
         try {
-            listener.onError(message == null ? "Terjadi kesalahan" : message);
+            listener.onError(message == null ? AiStrings.t(context, "Something went wrong", "Terjadi kesalahan") : message);
         } catch (Throwable t) {
             Log.e(TAG, "onError failed", t);
         }

@@ -14,6 +14,7 @@ import android.view.Gravity;
 import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -100,7 +101,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             guard = new AiProjectGuard(scId);
         } catch (Throwable t) {
             Log.e(TAG, "Invalid project", t);
-            Toast.makeText(this, "Proyek tidak valid: " + t.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, t("Invalid project: ", "Proyek tidak valid: ") + t.getMessage(), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -122,15 +123,16 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
                 markwon = null;
             }
             buildUi();
-            addNote("Alat tersedia: " + agent.toolCount() + ". Hanya proyek ini yang bisa diubah.");
-            addAiBubble("Halo! Jelaskan aplikasi yang ingin dibuat atau perubahan pada proyek ini. "
-                    + "Saya bisa mengedit file, mengatur konfigurasi (SDK, versi, izin, library, tema), build, dan memperbaiki error.");
             if (!AiSettings.hasApiKey(this)) showSettings();
         } catch (Throwable t) {
             Log.e(TAG, "Failed to build UI", t);
-            Toast.makeText(this, "Gagal membuka asisten: " + t.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, t("Failed to open assistant: ", "Gagal membuka asisten: ") + t.getMessage(), Toast.LENGTH_LONG).show();
             finish();
         }
+    }
+
+    private String t(String en, String id) {
+        return AiStrings.t(this, en, id);
     }
 
     private int dp(float v) {
@@ -178,8 +180,8 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
 
         // toolbar
         MaterialToolbar toolbar = new MaterialToolbar(this);
-        toolbar.setTitle("Asisten AI");
-        toolbar.setSubtitle("Proyek " + guard.getScId());
+        toolbar.setTitle(t("AI Assistant", "Asisten AI"));
+        toolbar.setSubtitle(t("Project ", "Proyek ") + guard.getScId());
         try {
             toolbar.setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material);
             if (toolbar.getNavigationIcon() != null) toolbar.getNavigationIcon().setTint(colorOnSurface);
@@ -187,9 +189,9 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
         }
         toolbar.setNavigationOnClickListener(v -> finish());
         Menu menu = toolbar.getMenu();
-        menu.add(Menu.NONE, 1, Menu.NONE, "Pengaturan AI");
-        menu.add(Menu.NONE, 2, Menu.NONE, "Percakapan baru");
-        menu.add(Menu.NONE, 3, Menu.NONE, "Pulihkan cadangan proyek");
+        menu.add(Menu.NONE, 1, Menu.NONE, t("AI settings", "Pengaturan AI"));
+        menu.add(Menu.NONE, 2, Menu.NONE, t("New conversation", "Percakapan baru"));
+        menu.add(Menu.NONE, 3, Menu.NONE, t("Restore project backup", "Pulihkan cadangan proyek"));
         toolbar.setOnMenuItemClickListener(item -> {
             try {
                 switch (item.getItemId()) {
@@ -206,7 +208,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
                         break;
                 }
             } catch (Throwable t) {
-                showError("Gagal: " + t.getMessage());
+                showError(t("Failed: ", "Gagal: ") + t.getMessage());
             }
             return true;
         });
@@ -240,7 +242,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
         runText.setTextSize(13);
         runBar.addView(runText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView stop = new TextView(this);
-        stop.setText("Hentikan");
+        stop.setText(t("Stop", "Hentikan"));
         stop.setTextColor(colorError);
         stop.setTextSize(14);
         stop.setTypeface(Typeface.DEFAULT_BOLD);
@@ -278,14 +280,14 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
         plus.setMinWidth(0);
         plus.setMinimumWidth(0);
         plus.setPadding(dp(14), 0, dp(14), 0);
-        plus.setContentDescription("Tambah lampiran");
+        plus.setContentDescription(t("Add attachment", "Tambah lampiran"));
         plus.setOnClickListener(v -> showAttachSheet());
         LinearLayout.LayoutParams plusLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
         plusLp.setMargins(0, 0, dp(6), 0);
         composer.addView(plus, plusLp);
 
         input = new EditText(this);
-        input.setHint("Jelaskan aplikasi atau perubahan yang kamu mau");
+        input.setHint(t("Describe the app or the change you want", "Jelaskan aplikasi atau perubahan yang kamu mau"));
         input.setTextColor(colorOnSurface);
         input.setHintTextColor(colorMuted);
         input.setTextSize(15);
@@ -297,7 +299,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
         composer.addView(input, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         sendButton = new MaterialButton(this);
-        sendButton.setText("Kirim");
+        sendButton.setText(t("Send", "Kirim"));
         sendButton.setOnClickListener(v -> onSend());
         LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
         sendLp.setMargins(dp(6), 0, 0, 0);
@@ -424,7 +426,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             col.addView(out);
             box.addView(bar, new LinearLayout.LayoutParams(dp(3), ViewGroup.LayoutParams.MATCH_PARENT));
             box.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            setStatus("berjalan", colorPrimary);
+            setStatus(t("running", "berjalan"), colorPrimary);
         }
 
         void setStatus(String status, int color) {
@@ -433,7 +435,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
         }
 
         void finish(boolean ok, String output) {
-            setStatus(ok ? "berhasil" : "gagal", ok ? colorOk : colorError);
+            setStatus(ok ? t("done", "berhasil") : t("failed", "gagal"), ok ? colorOk : colorError);
             out.setText(output == null ? "" : output);
             if (!ok) out.setVisibility(View.VISIBLE);
         }
@@ -453,14 +455,14 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             String text = input.getText().toString().trim();
             if (text.isEmpty() && pending.isEmpty()) return;
             if (!AiSettings.hasApiKey(this)) {
-                toast("Isi API key dulu");
+                toast(t("Enter an API key first", "Isi API key dulu"));
                 showSettings();
                 return;
             }
             final String sendText = text;
             final List<AiAttachments.Item> items = new ArrayList<>(pending);
             setRunning(true);
-            runText.setText("Menyiapkan cadangan proyek...");
+            runText.setText(t("Preparing project backup...", "Menyiapkan cadangan proyek..."));
 
             if (backupDone) {
                 dispatch(sendText, items);
@@ -471,7 +473,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
                     File zip = guard.createBackup();
                     backupDone = true;
                     ui(() -> {
-                        banner.setText("Cadangan proyek dibuat: " + zip.getName());
+                        banner.setText(t("Project backup created: ", "Cadangan proyek dibuat: ") + zip.getName());
                         banner.setVisibility(View.VISIBLE);
                         dispatch(sendText, items);
                     });
@@ -479,13 +481,13 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
                     Log.e(TAG, "Backup failed", t);
                     ui(() -> {
                         setRunning(false);
-                        showError("Cadangan proyek gagal, asisten tidak dijalankan demi keamanan: " + t.getMessage());
+                        showError(t("Project backup failed, assistant not started for safety: ", "Cadangan proyek gagal, asisten tidak dijalankan demi keamanan: ") + t.getMessage());
                     });
                 }
             }, "ai-backup").start();
         } catch (Throwable t) {
             setRunning(false);
-            showError("Gagal mengirim: " + t.getMessage());
+            showError(t("Failed to send: ", "Gagal mengirim: ") + t.getMessage());
         }
     }
 
@@ -500,13 +502,13 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             input.setText("");
             pending.clear();
             refreshChips();
-            runText.setText("Langkah 0 dari " + AiSettings.getMaxSteps(this));
+            runText.setText(t("Step 0 of ", "Langkah 0 dari ") + AiSettings.getMaxSteps(this));
             if (!agent.start(text, items)) {
                 setRunning(false);
             }
         } catch (Throwable t) {
             setRunning(false);
-            showError("Gagal memulai: " + t.getMessage());
+            showError(t("Failed to start: ", "Gagal memulai: ") + t.getMessage());
         }
     }
 
@@ -514,7 +516,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
         try {
             agent.stop();
             releaseConfirm(false);
-            runText.setText("Menghentikan...");
+            runText.setText(t("Stopping...", "Menghentikan..."));
         } catch (Throwable t) {
             Log.e(TAG, "stop failed", t);
         }
@@ -522,7 +524,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
 
     private void newConversation() {
         if (agent.isRunning()) {
-            toast("Tunggu selesai atau hentikan dulu");
+            toast(t("Wait until it finishes or stop it first", "Tunggu selesai atau hentikan dulu"));
             return;
         }
         agent.resetConversation();
@@ -531,29 +533,29 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
         toolRows.clear();
         chat.removeAllViews();
         refreshChips();
-        addAiBubble("Percakapan baru dimulai. Apa yang ingin dikerjakan?");
     }
 
     private void confirmRestore() {
         if (agent.isRunning()) {
-            toast("Tunggu asisten selesai dulu");
+            toast(t("Wait for the assistant to finish", "Tunggu asisten selesai dulu"));
             return;
         }
         File latest = guard.getLatestBackup();
         if (latest == null) {
-            toast("Belum ada cadangan untuk proyek ini");
+            toast(t("No backup for this project yet", "Belum ada cadangan untuk proyek ini"));
             return;
         }
         new MaterialAlertDialogBuilder(this)
-                .setTitle("Pulihkan cadangan?")
-                .setMessage("File proyek akan dikembalikan ke " + latest.getName() + ". File yang berubah setelahnya akan ditimpa.")
-                .setNegativeButton("Batal", null)
-                .setPositiveButton("Pulihkan", (d, w) -> new Thread(() -> {
+                .setTitle(t("Restore backup?", "Pulihkan cadangan?"))
+                .setMessage(t("Project files will be restored to " + latest.getName() + ". Files changed since then will be overwritten.",
+                        "File proyek akan dikembalikan ke " + latest.getName() + ". File yang berubah setelahnya akan ditimpa."))
+                .setNegativeButton(t("Cancel", "Batal"), null)
+                .setPositiveButton(t("Restore", "Pulihkan"), (d, w) -> new Thread(() -> {
                     try {
                         int count = guard.restoreLatestBackup();
-                        ui(() -> addNote("Cadangan dipulihkan (" + count + " file)."));
+                        ui(() -> addNote(t("Backup restored (" + count + " files).", "Cadangan dipulihkan (" + count + " file).")));
                     } catch (Throwable t) {
-                        ui(() -> showError("Gagal memulihkan: " + t.getMessage()));
+                        ui(() -> showError(t("Restore failed: ", "Gagal memulihkan: ") + t.getMessage()));
                     }
                 }, "ai-restore").start())
                 .show();
@@ -567,7 +569,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             LinearLayout col = new LinearLayout(this);
             col.setOrientation(LinearLayout.VERTICAL);
             col.setPadding(dp(8), dp(12), dp(8), dp(20));
-            String[][] options = {{"Gambar", "image/*"}, {"File", "*/*"}};
+            String[][] options = {{t("Image", "Gambar"), "image/*"}, {t("File", "File"), "*/*"}};
             for (String[] option : options) {
                 TextView row = new TextView(this);
                 row.setText(option[0]);
@@ -579,7 +581,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
                     try {
                         pickFile.launch(option[1]);
                     } catch (Throwable t) {
-                        toast("Tidak bisa membuka pemilih file");
+                        toast(t("Can't open the file picker", "Tidak bisa membuka pemilih file"));
                     }
                 });
                 col.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -587,7 +589,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             sheet.setContentView(col);
             sheet.show();
         } catch (Throwable t) {
-            showError("Gagal membuka menu lampiran: " + t.getMessage());
+            showError(t("Failed to open attachment menu: ", "Gagal membuka menu lampiran: ") + t.getMessage());
         }
     }
 
@@ -603,7 +605,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
                 });
             } catch (Throwable t) {
                 Log.e(TAG, "Attach failed", t);
-                ui(() -> toast("Gagal melampirkan: " + t.getMessage()));
+                ui(() -> toast(t("Failed to attach: ", "Gagal melampirkan: ") + t.getMessage()));
             }
         }, "ai-attach").start();
     }
@@ -631,20 +633,58 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
 
     // ---------------------------------------------------------------- settings
 
+    /** Fills the model spinner with the models of one provider and selects the saved one. */
+    private void fillModelSpinner(Spinner modelSpinner, AiProvider provider) {
+        String saved = AiSettings.getModelFor(this, provider);
+        String[] labels = new String[provider.models.length];
+        int selected = 0;
+        for (int i = 0; i < provider.models.length; i++) {
+            labels[i] = provider.models[i].label;
+            if (provider.models[i].id.equals(saved)) selected = i;
+        }
+        modelSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, labels));
+        modelSpinner.setSelection(selected);
+    }
+
+    private String keyHintFor(AiProvider provider) {
+        if (AiSettings.hasApiKeyFor(this, provider)) return t("Already saved. Leave empty to keep it", "Sudah tersimpan. Kosongkan jika tidak diubah");
+        switch (provider) {
+            case GEMINI:
+                return "AIza...";
+            case GPT:
+                return "sk-...";
+            case CLAUDE:
+                return "sk-ant-...";
+            default:
+                return t("Paste API key", "Tempel API key");
+        }
+    }
+
     private void showSettings() {
         try {
             LinearLayout col = new LinearLayout(this);
             col.setOrientation(LinearLayout.VERTICAL);
             col.setPadding(dp(24), dp(12), dp(24), 0);
 
+            final AiProvider[] providers = AiProvider.values();
+            final AiProvider currentProvider = AiSettings.getProvider(this);
+
+            TextView providerLabel = new TextView(this);
+            providerLabel.setText("Provider");
+            col.addView(providerLabel);
+            Spinner providerSpinner = new Spinner(this);
+            String[] providerNames = new String[providers.length];
+            for (int i = 0; i < providers.length; i++) providerNames[i] = providers[i].displayName;
+            providerSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, providerNames));
+            providerSpinner.setSelection(Math.max(0, Arrays.asList(providers).indexOf(currentProvider)));
+            col.addView(providerSpinner);
+
             TextView modelLabel = new TextView(this);
             modelLabel.setText("Model");
+            modelLabel.setPadding(0, dp(12), 0, 0);
             col.addView(modelLabel);
             Spinner spinner = new Spinner(this);
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, AiSettings.MODELS);
-            spinner.setAdapter(adapter);
-            int index = Arrays.asList(AiSettings.MODELS).indexOf(AiSettings.getModel(this));
-            spinner.setSelection(Math.max(0, index));
+            fillModelSpinner(spinner, currentProvider);
             col.addView(spinner);
 
             TextView keyLabel = new TextView(this);
@@ -653,17 +693,41 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             col.addView(keyLabel);
             EditText key = new EditText(this);
             key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-            key.setHint(AiSettings.hasApiKey(this) ? "Sudah tersimpan. Kosongkan jika tidak diubah" : "sk-ant-...");
+            key.setHint(keyHintFor(currentProvider));
             key.setSingleLine(true);
             col.addView(key);
+            providerSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    AiProvider p = providers[position];
+                    fillModelSpinner(spinner, p);
+                    key.setHint(keyHintFor(p));
+                }
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
+            });
             TextView keyHelp = new TextView(this);
-            keyHelp.setText("Key disimpan terenkripsi di perangkat ini.");
+            keyHelp.setText(t("The key is stored encrypted on this device.", "Key disimpan terenkripsi di perangkat ini."));
             keyHelp.setTextSize(12);
             keyHelp.setTextColor(colorMuted);
             col.addView(keyHelp);
 
+            TextView languageLabel = new TextView(this);
+            languageLabel.setText(t("Language", "Bahasa"));
+            languageLabel.setPadding(0, dp(12), 0, 0);
+            col.addView(languageLabel);
+            final String[] languageCodes = {AiSettings.LANG_EN, AiSettings.LANG_ID, AiSettings.LANG_AUTO};
+            String[] languageNames = {"English", "Bahasa Indonesia", t("Follow device", "Ikuti perangkat")};
+            Spinner languageSpinner = new Spinner(this);
+            languageSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, languageNames));
+            languageSpinner.setSelection(Math.max(0, Arrays.asList(languageCodes).indexOf(AiSettings.getLanguage(this))));
+            col.addView(languageSpinner);
+
             TextView stepsLabel = new TextView(this);
-            stepsLabel.setText("Batas langkah per tugas (" + AiSettings.MIN_STEPS + " sampai " + AiSettings.MAX_STEPS + ")");
+            stepsLabel.setText(t("Step limit per task (" + AiSettings.MIN_STEPS + " to " + AiSettings.MAX_STEPS + ")",
+                    "Batas langkah per tugas (" + AiSettings.MIN_STEPS + " sampai " + AiSettings.MAX_STEPS + ")"));
             stepsLabel.setPadding(0, dp(12), 0, 0);
             col.addView(stepsLabel);
             EditText steps = new EditText(this);
@@ -672,41 +736,54 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             col.addView(steps);
 
             CheckBox askBuild = new CheckBox(this);
-            askBuild.setText("Minta izin sebelum setiap build");
+            askBuild.setText(t("Ask permission before every build", "Minta izin sebelum setiap build"));
             askBuild.setChecked(AiSettings.isAskBeforeBuild(this));
             col.addView(askBuild);
 
             new MaterialAlertDialogBuilder(this)
-                    .setTitle("Pengaturan AI")
+                    .setTitle(t("AI settings", "Pengaturan AI"))
                     .setView(col)
-                    .setNegativeButton("Batal", null)
-                    .setNeutralButton("Hapus key", (d, w) -> {
-                        AiSettings.setApiKey(this, "");
-                        toast("API key dihapus");
+                    .setNegativeButton(t("Cancel", "Batal"), null)
+                    .setNeutralButton(t("Delete key", "Hapus key"), (d, w) -> {
+                        AiProvider target = providers[Math.max(0, providerSpinner.getSelectedItemPosition())];
+                        AiSettings.setApiKeyFor(this, target, "");
+                        toast(t("API key deleted: ", "API key dihapus: ") + target.displayName);
                     })
-                    .setPositiveButton("Simpan", (d, w) -> {
+                    .setPositiveButton(t("Save", "Simpan"), (d, w) -> {
                         try {
-                            Object selected = spinner.getSelectedItem();
-                            if (selected != null) AiSettings.setModel(this, String.valueOf(selected));
+                            AiProvider chosen = providers[Math.max(0, providerSpinner.getSelectedItemPosition())];
+                            AiSettings.setProvider(this, chosen);
+                            int modelIndex = spinner.getSelectedItemPosition();
+                            if (modelIndex >= 0 && modelIndex < chosen.models.length) {
+                                AiSettings.setModelFor(this, chosen, chosen.models[modelIndex].id);
+                            }
                             String newKey = key.getText().toString().trim();
-                            if (!newKey.isEmpty() && !AiSettings.setApiKey(this, newKey)) {
-                                toast("Gagal menyimpan key");
+                            if (!newKey.isEmpty() && !AiSettings.setApiKeyFor(this, chosen, newKey)) {
+                                toast(t("Failed to save key", "Gagal menyimpan key"));
                                 return;
                             }
                             try {
                                 AiSettings.setMaxSteps(this, Integer.parseInt(steps.getText().toString().trim()));
                             } catch (NumberFormatException e) {
-                                toast("Batas langkah tidak valid, tidak diubah");
+                                toast(t("Invalid step limit, not changed", "Batas langkah tidak valid, tidak diubah"));
                             }
                             AiSettings.setAskBeforeBuild(this, askBuild.isChecked());
-                            toast("Pengaturan disimpan");
+                            String oldLanguage = AiSettings.getLanguage(this);
+                            String newLanguage = languageCodes[Math.max(0, languageSpinner.getSelectedItemPosition())];
+                            AiSettings.setLanguage(this, newLanguage);
+                            if (!oldLanguage.equals(newLanguage)) {
+                                toast(t("Settings saved. Reopen the assistant to apply the language everywhere.",
+                                        "Pengaturan disimpan. Buka ulang asisten agar bahasa berlaku di semua tampilan."));
+                            } else {
+                                toast(t("Settings saved", "Pengaturan disimpan"));
+                            }
                         } catch (Throwable t) {
-                            toast("Gagal menyimpan: " + t.getMessage());
+                            toast(t("Failed to save: ", "Gagal menyimpan: ") + t.getMessage());
                         }
                     })
                     .show();
         } catch (Throwable t) {
-            showError("Gagal membuka pengaturan: " + t.getMessage());
+            showError(t("Failed to open settings: ", "Gagal membuka pengaturan: ") + t.getMessage());
         }
     }
 
@@ -739,7 +816,7 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
 
     @Override
     public void onStep(int used, int max) {
-        ui(() -> runText.setText("Langkah " + used + " dari " + max));
+        ui(() -> runText.setText(t("Step " + used + " of " + max, "Langkah " + used + " dari " + max)));
     }
 
     @Override
@@ -762,11 +839,11 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             }
             try {
                 new MaterialAlertDialogBuilder(this)
-                        .setTitle("Izin diperlukan")
+                        .setTitle(t("Permission required", "Izin diperlukan"))
                         .setMessage(text)
                         .setCancelable(false)
-                        .setNegativeButton("Tolak", (d, w) -> releaseConfirm(false))
-                        .setPositiveButton("Izinkan", (d, w) -> releaseConfirm(true))
+                        .setNegativeButton(t("Deny", "Tolak"), (d, w) -> releaseConfirm(false))
+                        .setPositiveButton(t("Allow", "Izinkan"), (d, w) -> releaseConfirm(true))
                         .show();
             } catch (Throwable t) {
                 releaseConfirm(false);
@@ -795,9 +872,9 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
     public void onFinished(String note) {
         ui(() -> {
             setRunning(false);
-            if ("dihentikan".equals(note)) addNote("Dihentikan.");
-            else if (note != null && note.startsWith("batas langkah")) addNote("Berhenti: " + note + ". Kirim pesan lagi untuk melanjutkan.");
-            else if (note != null && note.startsWith("jawaban terpotong")) addNote("Jawaban terpotong. Kirim 'lanjutkan' untuk meneruskan.");
+            if ("dihentikan".equals(note)) addNote(t("Stopped.", "Dihentikan."));
+            else if (note != null && note.startsWith("batas langkah")) addNote(t("Step limit reached. Send another message to continue.", "Batas langkah tercapai. Kirim pesan lagi untuk melanjutkan."));
+            else if (note != null && note.startsWith("jawaban terpotong")) addNote(t("The answer was cut off. Send 'continue' to resume.", "Jawaban terpotong. Kirim 'lanjutkan' untuk meneruskan."));
         });
     }
 

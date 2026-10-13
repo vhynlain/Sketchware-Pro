@@ -34,6 +34,10 @@ public final class AiSettings {
     @Deprecated
     public static final String DEFAULT_MODEL = MODELS[0];
 
+    public static final String LANG_AUTO = "auto";
+    public static final String LANG_EN   = "en";
+    public static final String LANG_ID   = "id";
+
     public static final int DEFAULT_MAX_STEPS = 20;
     public static final int MIN_STEPS         = 5;
     public static final int MAX_STEPS         = 40;
@@ -64,6 +68,7 @@ public final class AiSettings {
 
     private static final String K_MAX_STEPS       = "max_steps";
     private static final String K_ASK_BUILD       = "ask_before_build";
+    private static final String K_LANGUAGE        = "language";
 
     private AiSettings() { }
 
@@ -247,6 +252,28 @@ public final class AiSettings {
                     .apply();
         } catch (Throwable t) {
             Log.e(TAG, "Failed to store max steps", t);
+        }
+    }
+
+    // ================================================================ language
+
+    /** @return {@link #LANG_EN} (default), {@link #LANG_ID} or {@link #LANG_AUTO} */
+    public static String getLanguage(Context context) {
+        try {
+            String lang = prefs(context).getString(K_LANGUAGE, LANG_EN);
+            if (LANG_ID.equals(lang) || LANG_AUTO.equals(lang)) return lang;
+            return LANG_EN;
+        } catch (Throwable t) {
+            return LANG_EN;
+        }
+    }
+
+    public static void setLanguage(Context context, String lang) {
+        try {
+            String value = LANG_ID.equals(lang) || LANG_AUTO.equals(lang) ? lang : LANG_EN;
+            prefs(context).edit().putString(K_LANGUAGE, value).apply();
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to store language", t);
         }
     }
 

@@ -54,6 +54,10 @@ public final class AiClientOpenAICompat {
     private final String providerName;
     /** Base URL endpoint chat completions. */
     private final String endpoint;
+    /** Name of the request field that limits the answer length ("max_tokens" or "max_completion_tokens"). */
+    private final String tokenParam;
+    /** Answer length limit (reasoning models count their thinking tokens in it). */
+    private final int maxTokens;
 
     private final OkHttpClient http = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -69,8 +73,14 @@ public final class AiClientOpenAICompat {
      * @param endpoint     URL lengkap endpoint chat completions
      */
     public AiClientOpenAICompat(String providerName, String endpoint) {
+        this(providerName, endpoint, "max_tokens", MAX_TOKENS);
+    }
+
+    public AiClientOpenAICompat(String providerName, String endpoint, String tokenParam, int maxTokens) {
         this.providerName = providerName;
         this.endpoint     = endpoint;
+        this.tokenParam   = tokenParam;
+        this.maxTokens    = maxTokens;
     }
 
     // ---------------------------------------------------------------- Factory methods
@@ -87,7 +97,8 @@ public final class AiClientOpenAICompat {
 
     /** Buat client untuk OpenAI (GPT). */
     public static AiClientOpenAICompat openAI() {
-        return new AiClientOpenAICompat("OpenAI", "https://api.openai.com/v1/chat/completions");
+        // GPT-5 family rejects "max_tokens"; it needs "max_completion_tokens" (which also covers reasoning tokens)
+        return new AiClientOpenAICompat("OpenAI", "https://api.openai.com/v1/chat/completions", "max_completion_tokens", 16384);
     }
 
     // ---------------------------------------------------------------- Abort
@@ -292,42 +303,145 @@ public final class AiClientOpenAICompat {
         JSONObject body = new JSONObject();
         body.put("model", model.trim());
         body.put("stream", stream);
-        body.put("max_tokens", MAX_TOKENS);
+        body.put(tokenParam, maxTokens);
 
-        // Bangun messages array
         JSONArray messages = new JSONArray();
-
-        // System prompt sebagai pesan pertama
         if (systemPrompt != null && !systemPrompt.trim().isEmpty()) {
             messages.put(new JSONObject()
                     .put("role", "system")
                     .put("content", systemPrompt));
         }
-
-        // Konversi history Claude → OpenAI format
-        // Claude bisa punya content sebagai array [{type:"text",text:"..."}] — ratakan ke string
-        for (int i = 0; i < claudeHistory.length(); i++) {
-            JSONObject msg = claudeHistory.optJSONObject(i);
-            if (msg == null) continue;
-            String role    = msg.optString("role", "user");
-            String content = extractTextFromContent(msg.opt("content"));
-            if (content == null || content.isEmpty()) continue;
-            messages.put(new JSONObject().put("role", role).put("content", content));
-        }
-
+        convertHistory(messages, claudeHistory, model);
         body.put("messages", messages);
 
-        // Tools (hanya tambahkan jika ada dan provider mendukung)
         if (tools != null && tools.length() > 0) {
-            // Konversi Claude tool format ke OpenAI function-calling format
             JSONArray openAiTools = convertToolsToOpenAI(tools);
             if (openAiTools.length() > 0) {
                 body.put("tools", openAiTools);
                 body.put("tool_choice", "auto");
             }
         }
-
         return body;
+    }
+
+    /**
+     * Converts the Claude-format history (text, image, tool_use, tool_result blocks) to OpenAI chat messages:
+     * assistant tool_use -> assistant.tool_calls, user tool_result -> role "tool" messages.
+     */
+    private void convertHistory(JSONArray out, JSONArray history, String model) throws Exception {
+        boolean vision = supportsVision(model);
+        for (int i = 0; i < history.length(); i++) {
+            JSONObject msg = history.optJSONObject(i);
+            if (msg == null) continue;
+            boolean assistant = "assistant".equals(msg.optString("role", "user"));
+            Object content = msg.opt("content");
+
+            if (content instanceof String) {
+                String text = (String) content;
+                if (!text.isEmpty()) out.put(new JSONObject().put("role", assistant ? "assistant" : "user").put("content", text));
+                continue;
+            }
+            if (!(content instanceof JSONArray)) continue;
+            JSONArray blocks = (JSONArray) content;
+
+            if (assistant) {
+                StringBuilder text = new StringBuilder();
+                JSONArray calls = new JSONArray();
+                for (int j = 0; j < blocks.length(); j++) {
+                    JSONObject b = blocks.optJSONObject(j);
+                    if (b == null) continue;
+                    String type = b.optString("type");
+                    if ("text".equals(type)) {
+                        text.append(b.optString("text", ""));
+                    } else if ("tool_use".equals(type)) {
+                        JSONObject input = b.optJSONObject("input");
+                        if (input == null) input = new JSONObject();
+                        JSONObject fn = new JSONObject()
+                                .put("name", b.optString("name", ""))
+                                .put("arguments", input.toString());
+                        calls.put(new JSONObject()
+                                .put("id", toolId(b.optString("id", "")))
+                                .put("type", "function")
+                                .put("function", fn));
+                    }
+                }
+                if (text.length() == 0 && calls.length() == 0) continue;
+                JSONObject m = new JSONObject().put("role", "assistant");
+                if (text.length() > 0) m.put("content", text.toString());
+                if (calls.length() > 0) m.put("tool_calls", calls);
+                out.put(m);
+            } else {
+                JSONArray parts = new JSONArray();
+                StringBuilder plain = new StringBuilder();
+                boolean hasImage = false;
+                for (int j = 0; j < blocks.length(); j++) {
+                    JSONObject b = blocks.optJSONObject(j);
+                    if (b == null) continue;
+                    String type = b.optString("type");
+                    if ("tool_result".equals(type)) {
+                        String result = extractTextFromContent(b.opt("content"));
+                        if (result == null || result.isEmpty()) result = "(no output)";
+                        if (b.optBoolean("is_error", false)) result = "[error] " + result;
+                        out.put(new JSONObject()
+                                .put("role", "tool")
+                                .put("tool_call_id", toolId(b.optString("tool_use_id", "")))
+                                .put("content", result));
+                    } else if ("text".equals(type)) {
+                        String t = b.optString("text", "");
+                        if (t.isEmpty()) continue;
+                        parts.put(new JSONObject().put("type", "text").put("text", t));
+                        if (plain.length() > 0) plain.append('\n');
+                        plain.append(t);
+                    } else if ("image".equals(type)) {
+                        JSONObject source = b.optJSONObject("source");
+                        if (vision && source != null && source.optString("data", "").length() > 0) {
+                            String url = "data:" + source.optString("media_type", "image/jpeg") + ";base64," + source.optString("data");
+                            parts.put(new JSONObject().put("type", "image_url")
+                                    .put("image_url", new JSONObject().put("url", url)));
+                            hasImage = true;
+                        } else {
+                            String note = "[image omitted: this model cannot see images]";
+                            parts.put(new JSONObject().put("type", "text").put("text", note));
+                            if (plain.length() > 0) plain.append('\n');
+                            plain.append(note);
+                        }
+                    }
+                }
+                if (parts.length() == 0) continue;
+                out.put(new JSONObject().put("role", "user").put("content", hasImage ? parts : plain.toString()));
+            }
+        }
+    }
+
+    /** Which models of this provider accept image input. Unknown models get text only. */
+    private boolean supportsVision(String model) {
+        String m = model == null ? "" : model.toLowerCase(java.util.Locale.ROOT);
+        switch (providerName) {
+            case "OpenAI":
+                return true;
+            case "Mistral":
+                return m.contains("pixtral") || m.contains("mistral-medium") || m.contains("mistral-large") || m.contains("mistral-small");
+            case "Groq":
+                return m.contains("llama-4");
+            default:
+                return false;
+        }
+    }
+
+    /** Mistral only accepts tool call ids of exactly 9 letters/digits; map any id to such a value (same input, same output). */
+    private String toolId(String id) {
+        if (!"Mistral".equals(providerName)) return id;
+        if (id != null && id.matches("[a-zA-Z0-9]{9}")) return id;
+        long h = 1125899906842597L;
+        String src = id == null ? "" : id;
+        for (int i = 0; i < src.length(); i++) h = 31 * h + src.charAt(i);
+        StringBuilder sb = new StringBuilder(Long.toString(h & Long.MAX_VALUE, 36));
+        while (sb.length() < 9) sb.insert(0, '0');
+        return sb.substring(0, 9);
+    }
+
+    private static String newCallId() {
+        return java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 9);
     }
 
     /**
@@ -365,28 +479,75 @@ public final class AiClientOpenAICompat {
     // ---------------------------------------------------------------- Format conversion
 
     /**
-     * Konversi respons OpenAI ke format Claude agar AiAgent bisa memprosesnya.
-     *
-     * <p>OpenAI: {@code { "choices": [{ "message": { "role": "assistant", "content": "..." } }] }}
-     * Claude:  {@code { "content": [{ "type": "text", "text": "..." }], "stop_reason": "end_turn" }}
+     * Converts an OpenAI chat completion into the Claude format the agent understands:
+     * message.content -> text block, message.tool_calls -> tool_use blocks, finish_reason -> stop_reason.
      */
     private static JSONObject openAIToClaudeFormat(JSONObject openAIResp) throws Exception {
+        JSONArray content = new JSONArray();
+        boolean hasToolUse = false;
+        String finishReason = "";
         JSONArray choices = openAIResp.optJSONArray("choices");
-        String text = "";
-        String stopReason = "end_turn";
         if (choices != null && choices.length() > 0) {
             JSONObject choice = choices.optJSONObject(0);
             if (choice != null) {
+                finishReason = choice.optString("finish_reason", "");
                 JSONObject message = choice.optJSONObject("message");
-                if (message != null) text = message.optString("content", "");
-                String fr = choice.optString("finish_reason", "");
-                if ("stop".equals(fr) || "length".equals(fr)) stopReason = "end_turn";
+                if (message != null) {
+                    String text = contentToText(message.opt("content"));
+                    if (!text.isEmpty()) content.put(new JSONObject().put("type", "text").put("text", text));
+                    JSONArray calls = message.optJSONArray("tool_calls");
+                    if (calls != null) {
+                        for (int i = 0; i < calls.length(); i++) {
+                            JSONObject call = calls.optJSONObject(i);
+                            if (call == null) continue;
+                            JSONObject fn = call.optJSONObject("function");
+                            if (fn == null) continue;
+                            String name = fn.optString("name", "");
+                            if (name.isEmpty()) continue;
+                            String id = call.optString("id", "");
+                            if (id.isEmpty()) id = newCallId();
+                            content.put(new JSONObject()
+                                    .put("type", "tool_use")
+                                    .put("id", id)
+                                    .put("name", name)
+                                    .put("input", parseArguments(fn.opt("arguments"))));
+                            hasToolUse = true;
+                        }
+                    }
+                }
             }
         }
-        JSONObject textBlock = new JSONObject().put("type", "text").put("text", text);
-        return new JSONObject()
-                .put("content", new JSONArray().put(textBlock))
-                .put("stop_reason", stopReason);
+        if (content.length() == 0) content.put(new JSONObject().put("type", "text").put("text", ""));
+        String stopReason = hasToolUse ? "tool_use" : ("length".equals(finishReason) ? "max_tokens" : "end_turn");
+        return new JSONObject().put("content", content).put("stop_reason", stopReason);
+    }
+
+    /** Tool arguments arrive as a JSON string (sometimes malformed); fall back to an empty object. */
+    private static JSONObject parseArguments(Object raw) {
+        try {
+            if (raw instanceof JSONObject) return (JSONObject) raw;
+            if (raw instanceof String) {
+                String s = ((String) raw).trim();
+                if (s.isEmpty()) return new JSONObject();
+                return new JSONObject(s);
+            }
+        } catch (Throwable ignored) { }
+        return new JSONObject();
+    }
+
+    /** message.content is a string, or (Mistral reasoning models) a list of typed chunks. */
+    private static String contentToText(Object content) {
+        if (content instanceof String) return (String) content;
+        if (content instanceof JSONArray) {
+            JSONArray arr = (JSONArray) content;
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject chunk = arr.optJSONObject(i);
+                if (chunk != null && "text".equals(chunk.optString("type"))) sb.append(chunk.optString("text", ""));
+            }
+            return sb.toString();
+        }
+        return "";
     }
 
     private static String extractOpenAIDelta(JSONObject chunk) {
