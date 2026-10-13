@@ -528,13 +528,13 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
 
         bottomPopupMenu = new PopupMenu(this, btnOptions);
         bottomMenu = bottomPopupMenu.getMenu();
-        bottomMenu.add(Menu.NONE, 8, Menu.NONE, "Asisten AI").setOnMenuItemClickListener(item -> {
+        bottomMenu.add(Menu.NONE, 8, Menu.NONE, "AI Assistant").setOnMenuItemClickListener(item -> {
             try {
                 Intent aiIntent = new Intent(this, AiChatActivity.class);
                 aiIntent.putExtra(AiChatActivity.EXTRA_SC_ID, sc_id);
                 startActivity(aiIntent);
             } catch (Throwable t) {
-                SketchwareUtil.toastError("Gagal membuka Asisten AI: " + t.getMessage());
+                SketchwareUtil.toastError("Failed to open AI Assistant: " + t.getMessage());
             }
             return true;
         });
