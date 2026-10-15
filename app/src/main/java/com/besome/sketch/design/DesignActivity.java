@@ -364,7 +364,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         runOnUiThread(() -> {
             try {
                 if (currentBuildTask != null && !currentBuildTask.canceled && !currentBuildTask.isBuildFinished) {
-                    listener.onFinished(false, "Build lain sedang berjalan. Tunggu sampai selesai.");
+                    listener.onFinished(false, "Another build is already running. Wait until it finishes.");
                     return;
                 }
                 BuildTask buildTask = new BuildTask(this);
@@ -373,7 +373,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 currentBuildTask = buildTask;
                 buildTask.execute();
             } catch (Throwable t) {
-                listener.onFinished(false, "Gagal memulai build: " + t.getMessage());
+                listener.onFinished(false, "Could not start the build: " + t.getMessage());
             }
         });
     }
@@ -1291,7 +1291,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 isBuildFinished = true;
             } catch (MissingFileException e) {
                 activity.runOnUiThread(() -> AnalyticsHelper.logExportProject(activity, "debug_apk", activity.sc_id, false));
-                aiMessage = (e.isMissingDirectory() ? "Folder penting hilang: " : "File penting hilang: ") + e.getMissingFile().getAbsolutePath();
+                aiMessage = (e.isMissingDirectory() ? "Required folder is missing: " : "Required file is missing: ") + e.getMissingFile().getAbsolutePath();
                 isBuildFinished = true;
                 activity.runOnUiThread(() -> {
                     boolean isMissingDirectory = e.isMissingDirectory();
@@ -1344,12 +1344,16 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             try {
                 String message;
                 if (aiSuccess) {
-                    message = "APK berhasil dibuat.";
+                    message = "APK built successfully.";
+                    DesignActivity apkActivity = getActivity();
+                    if (apkActivity != null && apkActivity.q != null && apkActivity.q.finalToInstallApkPath != null) {
+                        message += "\nAPK_PATH: " + apkActivity.q.finalToInstallApkPath;
+                    }
                 } else if (canceled) {
-                    message = "Build dibatalkan.";
+                    message = "Build was cancelled before it finished (cancel pressed or the editor was closed).";
                 } else {
-                    message = aiMessage == null || aiMessage.isEmpty() ? "Build gagal tanpa pesan error." : aiMessage;
-                    if (message.length() > 12000) message = message.substring(0, 12000) + "\n...[dipotong, lihat get_build_log]";
+                    message = aiMessage == null || aiMessage.isEmpty() ? "Build failed without an error message. Call get_build_log." : aiMessage;
+                    if (message.length() > 12000) message = message.substring(0, 12000) + "\n...[cut, see get_build_log]";
                 }
                 listener.onFinished(aiSuccess, message);
             } catch (Throwable t) {
