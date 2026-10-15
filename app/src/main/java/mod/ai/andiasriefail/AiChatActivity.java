@@ -2,6 +2,7 @@ package mod.ai.andiasriefail;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -28,6 +29,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -394,14 +396,22 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
         }
     }
 
-    /** One tool call in the chat: a colored bar, a title line and a collapsible output block. */
+    /**
+     * One tool call in the chat: a colored bar, a title line, the real tool output (always visible, a short preview that
+     * expands on tap) and, after a successful build, an Install APK button.
+     */
     private final class ToolRow {
         final LinearLayout box = new LinearLayout(AiChatActivity.this);
         final View bar = new View(AiChatActivity.this);
         final TextView title = new TextView(AiChatActivity.this);
         final TextView out = new TextView(AiChatActivity.this);
+        final TextView apk = new TextView(AiChatActivity.this);
         final String name;
         final String summary;
+        final int previewLines = 14;
+        String status = "";
+        boolean expanded;
+        boolean hasMore;
 
         ToolRow(String name, String summary) {
             this.name = name;
@@ -421,23 +431,84 @@ public class AiChatActivity extends AppCompatActivity implements AiAgent.Listene
             out.setPadding(dp(10), dp(8), dp(10), dp(8));
             out.setTextIsSelectable(true);
             out.setVisibility(View.GONE);
-            title.setOnClickListener(v -> out.setVisibility(out.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+            View.OnClickListener toggle = v -> {
+                if (hasMore) {
+                    expanded = !expanded;
+                    applyExpansion();
+                    setStatus(status, currentColor);
+                }
+            };
+            title.setOnClickListener(toggle);
+            out.setOnClickListener(toggle);
+            apk.setText(t("Install APK", "Pasang APK"));
+            apk.setTextSize(14);
+            apk.setTypeface(Typeface.DEFAULT_BOLD);
+            apk.setTextColor(colorOnPrimary);
+            apk.setBackground(rounded(colorPrimary, 20));
+            apk.setPadding(dp(16), dp(10), dp(16), dp(10));
+            apk.setVisibility(View.GONE);
             col.addView(title);
             col.addView(out);
+            LinearLayout.LayoutParams apkLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            apkLp.topMargin = dp(6);
+            col.addView(apk, apkLp);
             box.addView(bar, new LinearLayout.LayoutParams(dp(3), ViewGroup.LayoutParams.MATCH_PARENT));
             box.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             setStatus(t("running", "berjalan"), colorPrimary);
         }
 
-        void setStatus(String status, int color) {
+        int currentColor;
+
+        void setStatus(String newStatus, int color) {
+            status = newStatus;
+            currentColor = color;
             bar.setBackgroundColor(color);
-            title.setText(name + (summary.isEmpty() ? "" : "  " + summary) + "  [" + status + "]");
+            String arrow = hasMore ? (expanded ? "  \u25B2" : "  \u25BC") : "";
+            title.setText(name + (summary.isEmpty() ? "" : "  " + summary) + "  [" + newStatus + "]" + arrow);
+        }
+
+        void applyExpansion() {
+            out.setMaxLines(expanded ? Integer.MAX_VALUE : previewLines);
+            out.setEllipsize(expanded ? null : android.text.TextUtils.TruncateAt.END);
         }
 
         void finish(boolean ok, String output) {
-            setStatus(ok ? t("done", "berhasil") : t("failed", "gagal"), ok ? colorOk : colorError);
-            out.setText(output == null ? "" : output);
-            if (!ok) out.setVisibility(View.VISIBLE);
+            String o = output == null ? "" : output;
+            boolean canceled = o.startsWith("BUILD_CANCELED");
+            int lines = o.isEmpty() ? 0 : o.split("\n", -1).length;
+            hasMore = lines > previewLines;
+            expanded = !ok;
+            setStatus(ok ? t("done", "berhasil") : canceled ? t("cancelled", "dibatalkan") : t("failed", "gagal"),
+                    ok ? colorOk : canceled ? colorWarn : colorError);
+            out.setText(o);
+            out.setVisibility(o.isEmpty() ? View.GONE : View.VISIBLE);
+            applyExpansion();
+            if (ok && "build_project".equals(name)) showInstall(o);
+        }
+
+        void showInstall(String o) {
+            for (String line : o.split("\n")) {
+                if (line.startsWith("APK_PATH: ")) {
+                    final File f = new File(line.substring("APK_PATH: ".length()).trim());
+                    if (f.isFile()) {
+                        apk.setVisibility(View.VISIBLE);
+                        apk.setOnClickListener(v -> installApk(f));
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    private void installApk(File apkFile) {
+        try {
+            Uri uri = FileProvider.getUriForFile(getApplicationContext(), getApplicationContext().getPackageName() + ".provider", apkFile);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, "application/vnd.android.package-archive");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+        } catch (Throwable t) {
+            toast(t("Could not open the installer: ", "Gagal membuka pemasang: ") + t.getMessage());
         }
     }
 

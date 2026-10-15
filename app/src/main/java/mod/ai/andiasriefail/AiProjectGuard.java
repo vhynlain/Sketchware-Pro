@@ -52,12 +52,12 @@ public final class AiProjectGuard {
 
     public AiProjectGuard(String scId) throws Exception {
         if (scId == null || !ID_PATTERN.matcher(scId).matches()) {
-            throw new IllegalArgumentException("ID proyek tidak valid");
+            throw new IllegalArgumentException("Invalid project ID");
         }
         this.scId = scId;
         this.dataDir = new File(Environment.getExternalStorageDirectory(), ".sketchware/data/" + scId);
         if (!dataDir.isDirectory()) {
-            throw new IOException("Proyek " + scId + " tidak ditemukan");
+            throw new IOException("Project " + scId + " not found");
         }
     }
 
@@ -86,8 +86,8 @@ public final class AiProjectGuard {
             case ROOT_CONFIG:
                 return dataDir;
             default:
-                throw new IllegalArgumentException("Awalan jalur tidak dikenal: " + rootName
-                        + ". Gunakan java/, res/, assets/, config/, atau generated/");
+                throw new IllegalArgumentException("Unknown path prefix: " + rootName
+                        + ". Use java/, res/, assets/, config/ or generated/ (a path starting with / always starts at the project root)");
         }
     }
 
@@ -124,12 +124,34 @@ public final class AiProjectGuard {
      * @param virtualPath path such as "res/layout/main.xml"
      * @param forWrite    true when the caller wants to modify the path
      */
+    /** Virtual working folder set by change_directory, for example "java/com/app". Empty = project root. */
+    private volatile String cwd = "";
+
+    public String getCwd() {
+        return cwd;
+    }
+
+    public void setCwd(String virtualFolder) {
+        cwd = virtualFolder == null ? "" : virtualFolder;
+    }
+
+    private static boolean isRootName(String s) {
+        return ROOT_JAVA.equals(s) || ROOT_RES.equals(s) || ROOT_ASSETS.equals(s) || ROOT_GENERATED.equals(s) || ROOT_CONFIG.equals(s);
+    }
+
     public Resolved resolve(String virtualPath, boolean forWrite) throws Exception {
-        if (virtualPath == null) throw new IllegalArgumentException("Jalur kosong");
+        if (virtualPath == null) throw new IllegalArgumentException("Empty path");
         String p = virtualPath.trim().replace('\\', '/');
-        if (p.indexOf('\0') >= 0) throw new IllegalArgumentException("Jalur tidak valid");
+        if (p.indexOf('\0') >= 0) throw new IllegalArgumentException("Invalid path");
+        boolean absolute = p.startsWith("/");
         while (p.startsWith("/")) p = p.substring(1);
-        if (p.isEmpty()) throw new IllegalArgumentException("Jalur kosong");
+        // Relative paths resolve from the working folder (see change_directory); "/" and root names always mean the project root.
+        if (!absolute && !cwd.isEmpty()) {
+            String first = p.contains("/") ? p.substring(0, p.indexOf('/')) : p;
+            if (p.isEmpty() || p.equals(".")) p = cwd;
+            else if (!isRootName(first)) p = cwd + "/" + p;
+        }
+        if (p.isEmpty()) throw new IllegalArgumentException("Empty path");
 
         String[] parts = p.split("/");
         String root = parts[0];
@@ -137,24 +159,24 @@ public final class AiProjectGuard {
         for (int i = 1; i < parts.length; i++) {
             String part = parts[i];
             if (part.isEmpty() || part.equals(".")) continue;
-            if (part.equals("..")) throw new SecurityException("Jalur dengan '..' ditolak");
+            if (part.equals("..")) throw new SecurityException("Paths with '..' are rejected; use change_directory .. instead");
             if (rel.length() > 0) rel.append('/');
             rel.append(part);
         }
 
         File rootDir = getRootDir(root);
         if (forWrite && !isWritableRoot(root)) {
-            throw new SecurityException("Folder " + root + "/ hanya bisa dibaca");
+            throw new SecurityException("Folder " + root + "/ is read-only");
         }
 
         String relative = rel.toString();
         if (ROOT_CONFIG.equals(root) && !relative.isEmpty()) {
             int access = configAccess(relative);
             if (access == 0) {
-                throw new SecurityException("Jalur config/" + relative + " tidak diizinkan. Lihat daftar dengan list_files path 'config'");
+                throw new SecurityException("config/" + relative + " is not allowed. List the allowed entries with list_files path 'config'");
             }
             if (forWrite && access < 2) {
-                throw new SecurityException("config/" + relative + " hanya bisa dibaca. Ubah lewat tool khususnya (set_project_info, set_build_setting, add_permission, dan sejenisnya)");
+                throw new SecurityException("config/" + relative + " is read-only. Change it through its dedicated tool (set_project_info, set_build_setting, add_permission, ...)");
             }
         }
         File target = relative.isEmpty() ? rootDir : new File(rootDir, relative);
@@ -164,10 +186,10 @@ public final class AiProjectGuard {
         boolean inside = canonicalTarget.equals(canonicalRoot)
                 || canonicalTarget.startsWith(canonicalRoot + File.separator);
         if (!inside) {
-            throw new SecurityException("Jalur keluar dari folder proyek, ditolak");
+            throw new SecurityException("Path leaves the project folder, rejected");
         }
         if (forWrite && relative.isEmpty()) {
-            throw new SecurityException("Tidak boleh mengubah folder akar " + root + "/ itu sendiri");
+            throw new SecurityException("Cannot modify the root folder " + root + "/ itself; write a file or a subfolder inside it");
         }
         return new Resolved(root, relative, target, relative.isEmpty());
     }
@@ -180,7 +202,7 @@ public final class AiProjectGuard {
             "proguard-rules.pro", "proguard", "proguard_fm", "stringfog",
             "injection/", "Injection/",
             "files/broadcast/", "files/service/", "files/native_libs/", "files/kt_plugins/", "files/library/",
-            "project_config", "build_config", "permission", "local_library", "compile_log"
+            "project_config", "build_config", "permission", "local_library", "compile_log", "custom_blocks"
     };
 
     /**
@@ -202,6 +224,7 @@ public final class AiProjectGuard {
             case "permission":
             case "local_library":
             case "compile_log":
+            case "custom_blocks":
                 return r.equals(first) ? 1 : 0;
             case "injection":
             case "Injection":
@@ -253,12 +276,19 @@ public final class AiProjectGuard {
         return isTextFileName(r.file.getName());
     }
 
+    private static final String[] BINARY_EXTENSIONS = {
+            ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".mp3", ".ogg", ".wav", ".m4a", ".aac", ".flac",
+            ".mp4", ".webm", ".3gp", ".ttf", ".otf", ".woff", ".woff2", ".zip", ".jar", ".aar", ".dex", ".so", ".apk",
+            ".aab", ".class", ".pdf", ".keystore", ".jks", ".bin", ".db"
+    };
+
+    /** Anything that is not a known binary type counts as text, so the AI can create files of any text format. */
     public static boolean isTextFileName(String name) {
         String lower = name.toLowerCase(Locale.ROOT);
-        for (String ext : TEXT_EXTENSIONS) {
-            if (lower.endsWith(ext)) return true;
+        for (String ext : BINARY_EXTENSIONS) {
+            if (lower.endsWith(ext)) return false;
         }
-        return false;
+        return true;
     }
 
     // ---------------------------------------------------------------- backup
@@ -276,7 +306,7 @@ public final class AiProjectGuard {
     public File createBackup() throws Exception {
         File dir = getBackupDir();
         if (!dir.isDirectory() && !dir.mkdirs()) {
-            throw new IOException("Tidak bisa membuat folder cadangan");
+            throw new IOException("Could not create the backup folder");
         }
         String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
         File zip = new File(dir, "backup_" + stamp + ".zip");
@@ -343,7 +373,7 @@ public final class AiProjectGuard {
      */
     public int restoreLatestBackup() throws Exception {
         File zip = getLatestBackup();
-        if (zip == null) throw new IOException("Belum ada cadangan untuk proyek ini");
+        if (zip == null) throw new IOException("There is no backup for this project yet");
         int count = 0;
         String canonicalData = dataDir.getCanonicalPath();
         try (ZipInputStream in = new ZipInputStream(new BufferedInputStream(new FileInputStream(zip)))) {
@@ -361,7 +391,7 @@ public final class AiProjectGuard {
                 }
                 File parent = target.getParentFile();
                 if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-                    throw new IOException("Gagal membuat folder " + parent);
+                    throw new IOException("Could not create folder " + parent);
                 }
                 try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(target))) {
                     byte[] buffer = new byte[8192];

@@ -58,8 +58,8 @@ public abstract class AiTool {
         return false;
     }
 
-    public String confirmationText(JSONObject input) {
-        return "Izinkan asisten menjalankan " + name() + "?";
+    public String confirmationText(Context context, JSONObject input) {
+        return AiStrings.t(context, "Allow the assistant to run " + name() + "?", "Izinkan asisten menjalankan " + name() + "?");
     }
 
     /**
@@ -79,7 +79,11 @@ public abstract class AiTool {
     public final Result execute(Env env, JSONObject input) {
         try {
             String out = run(env, input == null ? new JSONObject() : input);
-            return new Result(true, truncate(out));
+            // A build that finished but failed, timed out or was cancelled is returned as normal text.
+            // Report it as a failure so the model and the chat show red instead of a green "done".
+            boolean failed = out != null && (out.startsWith("BUILD_FAILED") || out.startsWith("BUILD_TIMEOUT")
+                    || out.startsWith("BUILD_CANCELED"));
+            return new Result(!failed, truncate(out));
         } catch (Throwable t) {
             String msg = t.getMessage();
             if (msg == null || msg.isEmpty()) msg = t.getClass().getSimpleName();
@@ -98,7 +102,8 @@ public abstract class AiTool {
     public static String truncate(String text) {
         if (text == null) return "";
         if (text.length() <= MAX_OUTPUT_CHARS) return text;
-        return text.substring(0, MAX_OUTPUT_CHARS) + "\n...[dipotong, " + (text.length() - MAX_OUTPUT_CHARS) + " karakter lagi]";
+        return text.substring(0, MAX_OUTPUT_CHARS) + "\n...[output cut: " + (text.length() - MAX_OUTPUT_CHARS)
+                + " more characters. Ask for a smaller part, for example read_file with start_line/end_line]";
     }
 
     // ------------------------------------------------------------ schema helpers

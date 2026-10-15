@@ -22,6 +22,9 @@ public final class AiToolRegistry {
         all.addAll(ToolsLibrary.all());
         all.addAll(ToolsBuild.all());
         all.addAll(ToolsAttachments.all());
+        all.addAll(ToolsEdit.all());
+        all.addAll(ToolsNav.all());
+        all.addAll(ToolsConfig.all());
         for (AiTool tool : all) tools.put(tool.name(), tool);
     }
 

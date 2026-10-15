@@ -132,7 +132,7 @@ public final class AiAgent {
     // ---------------------------------------------------------------- the loop
 
     private void runLoop() {
-        String note = "selesai";
+        String note = AiStrings.t(context, "done", "selesai");
         try {
             String apiKey = AiSettings.getApiKey(context);
             String model = AiSettings.getModel(context);
@@ -144,7 +144,7 @@ public final class AiAgent {
 
             while (true) {
                 if (stopRequested) {
-                    note = "dihentikan";
+                    note = AiStrings.t(context, "stopped", "dihentikan");
                     break;
                 }
                 compactHistory();
@@ -171,7 +171,7 @@ public final class AiAgent {
 
                 if (toolCalls.isEmpty()) {
                     if ("max_tokens".equals(response.optString("stop_reason"))) {
-                        note = "jawaban terpotong (batas panjang)";
+                        note = AiStrings.t(context, "answer cut off (length limit)", "jawaban terpotong (batas panjang)");
                     }
                     break;
                 }
@@ -182,10 +182,10 @@ public final class AiAgent {
                     String id = call.optString("id");
                     JSONObject result = new JSONObject().put("type", "tool_result").put("tool_use_id", id);
                     if (stopRequested) {
-                        result.put("content", "Dihentikan oleh pengguna").put("is_error", true);
+                        result.put("content", "Stopped by the user").put("is_error", true);
                     } else if (used >= max) {
                         limitHit = true;
-                        result.put("content", "Batas langkah per tugas tercapai. Hentikan dan rangkum keadaan terakhir untuk pengguna.").put("is_error", true);
+                        result.put("content", "Step limit per task reached. Stop and summarize the latest state for the user.").put("is_error", true);
                     } else {
                         used++;
                         safeStep(used, max);
@@ -200,11 +200,11 @@ public final class AiAgent {
                 history = withResults;
 
                 if (stopRequested) {
-                    note = "dihentikan";
+                    note = AiStrings.t(context, "stopped", "dihentikan");
                     break;
                 }
                 if (limitHit) {
-                    note = "batas langkah (" + max + ") tercapai";
+                    note = AiStrings.t(context, "step limit (" + max + ") reached", "batas langkah (" + max + ") tercapai");
                     // one last call so the model can summarize (tools stay declared because the history has tool calls)
                     try {
                         JSONObject last = client.send(apiKey, model, system, history, tools, provider);
@@ -227,7 +227,7 @@ public final class AiAgent {
         } catch (AiClient.AiException e) {
             repairHistory();
             if (e.cancelled || stopRequested) {
-                note = "dihentikan";
+                note = AiStrings.t(context, "stopped", "dihentikan");
             } else {
                 note = "error";
                 safeError(e.getMessage());
@@ -278,7 +278,7 @@ public final class AiAgent {
             if (needs) {
                 boolean allowed;
                 try {
-                    allowed = listener.confirm(name, tool.confirmationText(input));
+                    allowed = listener.confirm(name, tool.confirmationText(context, input));
                 } catch (Throwable t) {
                     allowed = false;
                 }
@@ -322,7 +322,7 @@ public final class AiAgent {
                 JSONObject b = content.optJSONObject(i);
                 if (b != null && "tool_use".equals(b.optString("type"))) {
                     results.put(new JSONObject().put("type", "tool_result").put("tool_use_id", b.optString("id"))
-                            .put("content", "Dibatalkan karena error").put("is_error", true));
+                            .put("content", "Cancelled because of an error").put("is_error", true));
                 }
             }
             if (results.length() > 0) {
@@ -355,9 +355,9 @@ public final class AiAgent {
                     if (b == null) continue;
                     String type = b.optString("type");
                     if ("tool_result".equals(type) && b.optString("content", "").length() > 400) {
-                        b.put("content", "[hasil lama dipotong untuk menghemat token]");
+                        b.put("content", "[old result cut to save tokens]");
                     } else if ("image".equals(type)) {
-                        content.put(j, new JSONObject().put("type", "text").put("text", "[gambar lama dihapus]"));
+                        content.put(j, new JSONObject().put("type", "text").put("text", "[old image removed]"));
                     }
                 }
             }
@@ -378,26 +378,26 @@ public final class AiAgent {
                     if (item.image) {
                         JSONObject block = imageBlock(item.file);
                         if (block != null) content.put(block);
-                        note.append("\n- ").append(item.id).append(": ").append(item.displayName).append(" (gambar)");
+                        note.append("\n- ").append(item.id).append(": ").append(item.displayName).append(" (image)");
                     } else if (isTextAttachment(item)) {
                         String body = ToolsFiles.readText(item.file);
                         if (body.length() > MAX_TEXT_ATTACHMENT_CHARS) {
-                            body = body.substring(0, MAX_TEXT_ATTACHMENT_CHARS) + "\n...[dipotong]";
+                            body = body.substring(0, MAX_TEXT_ATTACHMENT_CHARS) + "\n...[cut]";
                         }
                         content.put(new JSONObject().put("type", "text")
-                                .put("text", "Isi lampiran " + item.id + " (" + item.displayName + "):\n" + body));
+                                .put("text", "Content of attachment " + item.id + " (" + item.displayName + "):\n" + body));
                         note.append("\n- ").append(item.id).append(": ").append(item.displayName).append(" (teks, isi disertakan di atas)");
                     } else {
                         note.append("\n- ").append(item.id).append(": ").append(item.displayName).append(" (").append(item.mime).append(")");
                     }
                 } catch (Throwable t) {
-                    note.append("\n- ").append(item.id).append(": ").append(item.displayName).append(" (gagal dibaca: ").append(t.getMessage()).append(")");
+                    note.append("\n- ").append(item.id).append(": ").append(item.displayName).append(" (could not be read: ").append(t.getMessage()).append(")");
                 }
             }
         }
         String full = text == null ? "" : text.trim();
-        if (note.length() > 0) full += "\n\n[Lampiran dari pengguna]" + note;
-        if (full.isEmpty()) full = "(tanpa teks)";
+        if (note.length() > 0) full += "\n\n[Attachments from the user]" + note;
+        if (full.isEmpty()) full = "(no text)";
         content.put(new JSONObject().put("type", "text").put("text", full));
         return content;
     }
