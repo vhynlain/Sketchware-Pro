@@ -54,7 +54,7 @@ public final class ToolsProject {
 
     static HashMap<String, Object> metadata(String scId) throws Exception {
         HashMap<String, Object> map = lC.b(scId);
-        if (map == null) throw new IllegalStateException("Data proyek tidak bisa dibaca");
+        if (map == null) throw new IllegalStateException("Project data could not be read");
         return map;
     }
 
@@ -73,8 +73,8 @@ public final class ToolsProject {
 
         @Override
         public String description() {
-            return "Membaca info proyek: nama aplikasi, package, version name/code, min dan target SDK, "
-                    + "pengaturan build (Java, dexer, logcat), serta ikon kustom.";
+            return "Reads project info: app name, package, version name/code, min and target SDK, "
+                    + "build settings (Java, dexer, logcat) and the custom icon.";
         }
 
         @Override
@@ -94,19 +94,19 @@ public final class ToolsProject {
             ProjectSettings ps = new ProjectSettings(id);
             BuildSettings bs = new BuildSettings(id);
             StringBuilder sb = new StringBuilder();
-            sb.append("nama_aplikasi: ").append(str(m, "my_app_name")).append('\n');
-            sb.append("nama_proyek: ").append(str(m, "my_ws_name")).append('\n');
+            sb.append("app_name: ").append(str(m, "my_app_name")).append('\n');
+            sb.append("project_name: ").append(str(m, "my_ws_name")).append('\n');
             sb.append("package: ").append(str(m, "my_sc_pkg_name")).append('\n');
             sb.append("version_name: ").append(str(m, "sc_ver_name")).append('\n');
             sb.append("version_code: ").append(str(m, "sc_ver_code")).append('\n');
-            sb.append("ikon_kustom: ").append(str(m, "custom_icon")).append('\n');
+            sb.append("custom_icon: ").append(str(m, "custom_icon")).append('\n');
             sb.append("min_sdk: ").append(ps.getValue(ProjectSettings.SETTING_MINIMUM_SDK_VERSION,
                     String.valueOf(Config.VAR_DEFAULT_MIN_SDK_VERSION))).append('\n');
             sb.append("target_sdk: ").append(ps.getValue(ProjectSettings.SETTING_TARGET_SDK_VERSION,
                     String.valueOf(Config.VAR_DEFAULT_TARGET_SDK_VERSION))).append('\n');
             sb.append("java_ver: ").append(bs.getValue(BuildSettings.SETTING_JAVA_VERSION, BuildSettings.DEFAULT_JAVA_VERSION)).append('\n');
             sb.append("dexer: ").append(bs.getValue(BuildSettings.SETTING_DEXER, BuildSettings.DEFAULT_DEXER)).append('\n');
-            sb.append("enable_logcat (mode debug): ").append(bs.getValue(BuildSettings.SETTING_ENABLE_LOGCAT, "true")).append('\n');
+            sb.append("enable_logcat (debug mode): ").append(bs.getValue(BuildSettings.SETTING_ENABLE_LOGCAT, "true")).append('\n');
             return sb.toString();
         }
     }
@@ -119,16 +119,16 @@ public final class ToolsProject {
 
         @Override
         public String description() {
-            return "Mengubah nama aplikasi, version name, dan/atau version code. Isi hanya yang ingin diubah. "
-                    + "Package name dan nama proyek tidak bisa diubah lewat tool ini.";
+            return "Changes the app name, version name and/or version code. Fill in only what should change. "
+                    + "The package name and project name cannot be changed with this tool.";
         }
 
         @Override
         public JSONObject schema() throws Exception {
             return props(new String[]{},
-                    "app_name", "string", "Nama aplikasi yang tampil di launcher.",
-                    "version_name", "string", "Teks versi, misalnya 1.2.0 (huruf, angka, titik, minus).",
-                    "version_code", "integer", "Kode versi bilangan bulat >= 1.");
+                    "app_name", "string", "App name shown in the launcher.",
+                    "version_name", "string", "Version text, for example 1.2.0 (letters, digits, dot, minus).",
+                    "version_code", "integer", "Integer version code >= 1.");
         }
 
         @Override
@@ -144,23 +144,23 @@ public final class ToolsProject {
 
             if (input.has("app_name") && !input.isNull("app_name")) {
                 String name = input.getString("app_name").trim();
-                if (name.isEmpty() || name.length() > 60) throw new IllegalArgumentException("app_name harus 1 sampai 60 karakter");
+                if (name.isEmpty() || name.length() > 60) throw new IllegalArgumentException("app_name must be 1 to 60 characters");
                 m.put("my_app_name", name);
                 changes.add("app_name=" + name);
             }
             if (input.has("version_name") && !input.isNull("version_name")) {
                 String v = input.getString("version_name").trim();
-                if (!VERSION_NAME.matcher(v).matches()) throw new IllegalArgumentException("version_name tidak valid");
+                if (!VERSION_NAME.matcher(v).matches()) throw new IllegalArgumentException("version_name is not valid");
                 m.put("sc_ver_name", v);
                 changes.add("version_name=" + v);
             }
             if (input.has("version_code") && !input.isNull("version_code")) {
                 int code = input.getInt("version_code");
-                if (code < 1) throw new IllegalArgumentException("version_code harus >= 1");
+                if (code < 1) throw new IllegalArgumentException("version_code must be >= 1");
                 m.put("sc_ver_code", String.valueOf(code));
                 changes.add("version_code=" + code);
             }
-            if (changes.isEmpty()) return "Tidak ada yang diubah (isi app_name, version_name, atau version_code).";
+            if (changes.isEmpty()) return "Nothing changed (give app_name, version_name or version_code).";
 
             lC.b(id, m);
 
@@ -177,7 +177,7 @@ public final class ToolsProject {
                     ToolsFiles.writeText(strings, updated);
                 }
             }
-            return "Diubah: " + String.join(", ", changes);
+            return "Changed: " + String.join(", ", changes);
         }
     }
 
@@ -189,7 +189,7 @@ public final class ToolsProject {
 
         @Override
         public String description() {
-            return "Mengubah minSdk dan/atau targetSdk. Isi hanya yang ingin diubah. Rentang 21 sampai 40, min tidak boleh lebih besar dari target.";
+            return "Changes minSdk and/or targetSdk. Fill in only what should change. Range 21 to 40; min must not be greater than target.";
         }
 
         @Override
@@ -211,8 +211,8 @@ public final class ToolsProject {
             int target = Integer.parseInt(ps.getValue(ProjectSettings.SETTING_TARGET_SDK_VERSION, String.valueOf(Config.VAR_DEFAULT_TARGET_SDK_VERSION)));
             if (input.has("min_sdk") && !input.isNull("min_sdk")) min = input.getInt("min_sdk");
             if (input.has("target_sdk") && !input.isNull("target_sdk")) target = input.getInt("target_sdk");
-            if (min < 21 || min > 40 || target < 21 || target > 40) throw new IllegalArgumentException("SDK harus di antara 21 dan 40");
-            if (min > target) throw new IllegalArgumentException("min_sdk (" + min + ") tidak boleh lebih besar dari target_sdk (" + target + ")");
+            if (min < 21 || min > 40 || target < 21 || target > 40) throw new IllegalArgumentException("SDK must be between 21 and 40");
+            if (min > target) throw new IllegalArgumentException("min_sdk (" + min + ") must not be greater than target_sdk (" + target + ")");
             ps.setValue(ProjectSettings.SETTING_MINIMUM_SDK_VERSION, String.valueOf(min));
             ps.setValue(ProjectSettings.SETTING_TARGET_SDK_VERSION, String.valueOf(target));
             return "min_sdk=" + min + ", target_sdk=" + target;
@@ -227,7 +227,7 @@ public final class ToolsProject {
 
         @Override
         public String description() {
-            return "Membaca semua pengaturan proyek dan build yang bisa diubah lewat set_build_setting, beserta nilainya saat ini.";
+            return "Reads all project and build settings that can be changed with set_build_setting, with their current values.";
         }
 
         @Override
@@ -260,7 +260,7 @@ public final class ToolsProject {
             sb.append("disable_old_methods=").append(ps.getValue(ProjectSettings.SETTING_DISABLE_OLD_METHODS, "false")).append('\n');
             sb.append("xml_command=").append(ps.getValue(ProjectSettings.SETTING_NEW_XML_COMMAND, "false")).append('\n');
             sb.append("app_class=").append(ps.getValue(ProjectSettings.SETTING_APPLICATION_CLASS, ".SketchApplication")).append('\n');
-            sb.append("\nCatatan: ProGuard, StringFog, izin, dan library lokal punya tool atau file config sendiri (lihat list_files path 'config').");
+            sb.append("\nNote: ProGuard, StringFog, permissions and local libraries have their own tools (get_code_shrinking, get_stringfog, list_permissions, list_local_libraries).");
             return sb.toString();
         }
     }
@@ -273,17 +273,17 @@ public final class ToolsProject {
 
         @Override
         public String description() {
-            return "Mengubah satu pengaturan. Kunci: java_ver (1.7, 1.8, 1.9, 10 sampai 17), dexer (D8 atau Dx), "
-                    + "no_http_legacy, no_warn, enable_logcat (mode debug on/off), enable_bridgeless_themes, enable_viewbinding, "
-                    + "disable_old_methods, xml_command (true/false), app_class (nama kelas Application), "
-                    + "classpath dan android_jar (jalur file di dalam /sdcard/.sketchware/, dipisah ':' untuk classpath).";
+            return "Changes one setting. Keys: java_ver (1.7, 1.8, 1.9, 10 to 17), dexer (D8 or Dx), "
+                    + "no_http_legacy, no_warn, enable_logcat (debug mode on/off), enable_bridgeless_themes, enable_viewbinding, "
+                    + "disable_old_methods, xml_command (true/false), app_class (Application class name), "
+                    + "classpath and android_jar (file paths inside /sdcard/.sketchware/, classpath entries separated by ':').";
         }
 
         @Override
         public JSONObject schema() throws Exception {
             return props(new String[]{"key", "value"},
-                    "key", "string", "Nama pengaturan.",
-                    "value", "string", "Nilai baru. Boolean ditulis true atau false.");
+                    "key", "string", "Setting name.",
+                    "value", "string", "New value. Booleans are written true or false.");
         }
 
         @Override
@@ -299,9 +299,9 @@ public final class ToolsProject {
                 File f = new File(p).getCanonicalFile();
                 String c = f.getPath();
                 if (!c.startsWith(base.getPath() + File.separator)) {
-                    throw new SecurityException("Jalur harus berada di dalam " + base.getPath() + " : " + p);
+                    throw new SecurityException("Path must be inside " + base.getPath() + " : " + p);
                 }
-                if (!f.exists()) throw new IllegalArgumentException("File tidak ada: " + p);
+                if (!f.exists()) throw new IllegalArgumentException("File does not exist: " + p);
             }
         }
 
@@ -314,15 +314,15 @@ public final class ToolsProject {
             boolean buildKey = BUILD_KEYS.contains(key);
             boolean projectKey = PROJECT_KEYS.contains(key);
             if (!buildKey && !projectKey) {
-                throw new IllegalArgumentException("Kunci tidak dikenal: " + key + ". Lihat get_build_settings.");
+                throw new IllegalArgumentException("Unknown key: " + key + ". See get_build_settings.");
             }
 
             switch (key) {
                 case BuildSettings.SETTING_JAVA_VERSION:
-                    if (!JAVA_VERSIONS.contains(value)) throw new IllegalArgumentException("java_ver harus salah satu: " + JAVA_VERSIONS + ". Maksimal 17.");
+                    if (!JAVA_VERSIONS.contains(value)) throw new IllegalArgumentException("java_ver must be one of: " + JAVA_VERSIONS + ". Maximum 17.");
                     break;
                 case BuildSettings.SETTING_DEXER:
-                    if (!value.equals("D8") && !value.equals("Dx")) throw new IllegalArgumentException("dexer harus D8 atau Dx");
+                    if (!value.equals("D8") && !value.equals("Dx")) throw new IllegalArgumentException("dexer must be D8 or Dx");
                     break;
                 case BuildSettings.SETTING_NO_HTTP_LEGACY:
                 case BuildSettings.SETTING_NO_WARNINGS:
@@ -331,10 +331,10 @@ public final class ToolsProject {
                 case ProjectSettings.SETTING_ENABLE_VIEWBINDING:
                 case ProjectSettings.SETTING_DISABLE_OLD_METHODS:
                 case ProjectSettings.SETTING_NEW_XML_COMMAND:
-                    if (!isBool(value)) throw new IllegalArgumentException(key + " harus true atau false");
+                    if (!isBool(value)) throw new IllegalArgumentException(key + " must be true or false");
                     break;
                 case ProjectSettings.SETTING_APPLICATION_CLASS:
-                    if (!CLASS_NAME.matcher(value).matches()) throw new IllegalArgumentException("app_class bukan nama kelas yang valid");
+                    if (!CLASS_NAME.matcher(value).matches()) throw new IllegalArgumentException("app_class is not a valid class name");
                     break;
                 case BuildSettings.SETTING_CLASSPATH:
                 case BuildSettings.SETTING_ANDROID_JAR_PATH:
@@ -349,7 +349,7 @@ public final class ToolsProject {
 
             String extra = "";
             if (key.equals(BuildSettings.SETTING_JAVA_VERSION) && !value.equals("17")) {
-                extra = " (disarankan 17 dengan dexer D8)";
+                extra = " (17 with the D8 dexer is recommended)";
             }
             if (key.equals(BuildSettings.SETTING_DEXER) && value.equals("Dx")) {
                 extra = " (disarankan D8)";

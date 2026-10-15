@@ -78,8 +78,8 @@ public final class ToolsLibrary {
 
         @Override
         public String description() {
-            return "Menampilkan library lokal yang terpasang di perangkat dan mana yang dicentang di proyek ini. "
-                    + "Library yang tidak terpasang tidak bisa diunduh olehmu; minta pengguna mengunduhnya.";
+            return "Lists the local libraries installed on the device and which of them are ticked in this project. "
+                    + "A library that is not installed cannot be downloaded by you; ask the user to download it.";
         }
 
         @Override
@@ -100,17 +100,17 @@ public final class ToolsLibrary {
             for (HashMap<String, Object> m : enabled) enabledNames.add(nameOf(m));
 
             StringBuilder sb = new StringBuilder();
-            sb.append("Dicentang di proyek (").append(enabledNames.size()).append("):\n");
-            if (enabledNames.isEmpty()) sb.append("  (tidak ada)\n");
+            sb.append("Enabled in project (").append(enabledNames.size()).append("):\n");
+            if (enabledNames.isEmpty()) sb.append("  (none)\n");
             for (String n : enabledNames) {
-                sb.append("  ").append(n).append(installed.contains(n) ? "" : "   [FILE LIBRARY HILANG di perangkat]").append('\n');
+                sb.append("  ").append(n).append(installed.contains(n) ? "" : "   [LIBRARY FILE MISSING on the device]").append('\n');
             }
-            sb.append("Terpasang di perangkat (").append(installed.size()).append("):\n");
-            if (installed.isEmpty()) sb.append("  (tidak ada)\n");
+            sb.append("Installed on the device (").append(installed.size()).append("):\n");
+            if (installed.isEmpty()) sb.append("  (none)\n");
             List<String> sorted = new ArrayList<>(installed);
             Collections.sort(sorted, String.CASE_INSENSITIVE_ORDER);
             for (String n : sorted) {
-                sb.append("  ").append(n).append(enabledNames.contains(n) ? "   [dicentang]" : "").append('\n');
+                sb.append("  ").append(n).append(enabledNames.contains(n) ? "   [enabled]" : "").append('\n');
             }
             return sb.toString();
         }
@@ -124,8 +124,8 @@ public final class ToolsLibrary {
 
         @Override
         public String description() {
-            return "Memeriksa library yang dicentang: apakah file-nya ada, dan perkiraan apakah kode proyek memakainya "
-                    + "(heuristik: mencari nama package di kode Java dan hasil generate). Hasilnya perkiraan, bukan kepastian.";
+            return "Checks the enabled libraries: whether their files exist and an estimate of whether the project code uses them "
+                    + "(heuristic: looks for the package name in the Java code and the generated code). The result is an estimate, not proof.";
         }
 
         @Override
@@ -142,7 +142,7 @@ public final class ToolsLibrary {
         protected String run(Env env, JSONObject input) throws Exception {
             Set<String> installed = installedNames();
             List<HashMap<String, Object>> enabled = LocalLibrariesUtil.getLocalLibraries(env.guard.getScId());
-            if (enabled.isEmpty()) return "Tidak ada library yang dicentang di proyek ini.";
+            if (enabled.isEmpty()) return "No library is enabled in this project.";
             String sources = collectSources(env.guard);
 
             StringBuilder sb = new StringBuilder();
@@ -150,27 +150,27 @@ public final class ToolsLibrary {
                 String name = nameOf(m);
                 sb.append(name).append(":\n");
                 boolean present = installed.contains(name);
-                sb.append("  file di perangkat: ").append(present ? "ada" : "HILANG (tercentang tapi tidak terpasang)").append('\n');
+                sb.append("  file on the device: ").append(present ? "ada" : "MISSING (enabled but not installed)").append('\n');
                 if (present) {
-                    sb.append("  isi: ");
+                    sb.append("  content: ");
                     List<String> parts = new ArrayList<>();
                     if (pathExists(m, "jarPath")) parts.add("classes.jar");
                     if (pathExists(m, "dexPath")) parts.add("classes.dex");
                     if (pathExists(m, "resPath")) parts.add("res");
                     if (pathExists(m, "assetsPath")) parts.add("assets");
-                    sb.append(parts.isEmpty() ? "TIDAK ADA jar/dex/res (library kosong)" : String.join(", ", parts)).append('\n');
+                    sb.append(parts.isEmpty() ? "NO jar/dex/res (empty library)" : String.join(", ", parts)).append('\n');
                 }
                 Object pkg = m.get("packageName");
                 if (pkg != null && !String.valueOf(pkg).trim().isEmpty()) {
                     String p = String.valueOf(pkg).trim();
                     boolean used = sources.contains(p);
                     sb.append("  package ").append(p).append(": ")
-                            .append(used ? "ADA referensi di kode" : "tidak ditemukan referensi di kode").append('\n');
+                            .append(used ? "references FOUND in code" : "no references found in code").append('\n');
                 } else {
-                    sb.append("  package tidak diketahui, tidak bisa diperiksa pemakaiannya\n");
+                    sb.append("  package unknown, usage cannot be checked\n");
                 }
             }
-            sb.append("\nCatatan: hasil bersifat perkiraan. Library AndroidX bawaan Sketchware dan library lain mungkin dipakai tanpa import eksplisit.");
+            sb.append("\nNote: the result is an estimate. Sketchware's built-in AndroidX libraries and other libraries may be used without an explicit import.");
             return sb.toString();
         }
     }
@@ -183,15 +183,15 @@ public final class ToolsLibrary {
 
         @Override
         public String description() {
-            return "Mencentang (enabled true) atau membatalkan centang (enabled false) satu library lokal di proyek ini. "
-                    + "Mencentang hanya bisa untuk library yang sudah terpasang di perangkat. Tidak mengunduh dan tidak menghapus file library.";
+            return "Enables (enabled true) or disables (enabled false) one local library in this project. "
+                    + "Enabling only works for libraries that are already installed on the device. It does not download or delete library files.";
         }
 
         @Override
         public JSONObject schema() throws Exception {
             return props(new String[]{"name", "enabled"},
-                    "name", "string", "Nama library persis seperti di list_local_libraries.",
-                    "enabled", "boolean", "true untuk mencentang, false untuk membatalkan.");
+                    "name", "string", "Library name exactly as in list_local_libraries.",
+                    "enabled", "boolean", "true to enable, false to disable.");
         }
 
         @Override
@@ -216,17 +216,17 @@ public final class ToolsLibrary {
             }
 
             if (enable) {
-                if (existing != null) return name + " sudah dicentang.";
+                if (existing != null) return name + " is already enabled.";
                 if (!installedNames().contains(name)) {
-                    return "Error: library '" + name + "' belum terpasang di perangkat. Minta pengguna mengunduhnya lewat menu Local library, lalu coba lagi.";
+                    return "Error: library '" + name + "' is not installed on the device. Ask the user to download it in the Local library menu, then try again.";
                 }
                 list.add(LocalLibrariesUtil.createLibraryMap(name, null));
             } else {
-                if (existing == null) return name + " memang tidak dicentang.";
+                if (existing == null) return name + " was not enabled.";
                 list.remove(existing);
             }
             LocalLibrariesUtil.rewriteLocalLibFile(id, new Gson().toJson(list));
-            return (enable ? "Dicentang: " : "Centang dibatalkan: ") + name;
+            return (enable ? "Enabled: " : "Disabled: ") + name;
         }
     }
 
