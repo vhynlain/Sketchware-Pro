@@ -98,6 +98,8 @@ import a.a.a.yq;
 import a.a.a.zy;
 import dev.chrisbanes.insetter.Insetter;
 import mod.agus.jcoderz.editor.manage.permission.ManagePermissionActivity;
+import mod.ai.andiasriefail.AiBuildBridge;
+import mod.ai.andiasriefail.AiChatActivity;
 import mod.agus.jcoderz.editor.manage.resource.ManageResourceActivity;
 import mod.bobur.FloatingProgressWindow;
 import mod.hey.studios.activity.managers.assets.ManageAssetsActivity;
@@ -205,6 +207,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         }
     });
     private BuildTask currentBuildTask;
+    private AiBuildBridge.Runner aiBuildRunner;
     private final BroadcastReceiver buildCancelReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -355,6 +358,27 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     }
 
     /**
+     * Starts a build requested by the AI assistant. The APK is not installed, and the result goes to the listener.
+     */
+    private void startBuildForAi(AiBuildBridge.Listener listener) {
+        runOnUiThread(() -> {
+            try {
+                if (currentBuildTask != null && !currentBuildTask.canceled && !currentBuildTask.isBuildFinished) {
+                    listener.onFinished(false, "Another build is already running. Wait until it finishes.");
+                    return;
+                }
+                BuildTask buildTask = new BuildTask(this);
+                buildTask.aiListener = listener;
+                buildTask.aiSkipInstall = true;
+                currentBuildTask = buildTask;
+                buildTask.execute();
+            } catch (Throwable t) {
+                listener.onFinished(false, "Could not start the build: " + t.getMessage());
+            }
+        });
+    }
+
+    /**
      * Opens the debug APK to install.
      */
     private void installBuiltApk() {
@@ -496,11 +520,24 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             buildTask.execute();
         });
 
+        aiBuildRunner = this::startBuildForAi;
+        AiBuildBridge.register(sc_id, aiBuildRunner);
+
         btnOptions = binding.btnOptions;
         btnOptions.setOnClickListener(v -> bottomPopupMenu.show());
 
         bottomPopupMenu = new PopupMenu(this, btnOptions);
         bottomMenu = bottomPopupMenu.getMenu();
+        bottomMenu.add(Menu.NONE, 8, Menu.NONE, "AI Assistant").setOnMenuItemClickListener(item -> {
+            try {
+                Intent aiIntent = new Intent(this, AiChatActivity.class);
+                aiIntent.putExtra(AiChatActivity.EXTRA_SC_ID, sc_id);
+                startActivity(aiIntent);
+            } catch (Throwable t) {
+                SketchwareUtil.toastError("Failed to open AI Assistant: " + t.getMessage());
+            }
+            return true;
+        });
         bottomMenu.add(Menu.NONE, 1, Menu.NONE, "Build Settings").setOnMenuItemClickListener(item -> {
             BuildSettingsBottomSheet sheet = BuildSettingsBottomSheet.newInstance(sc_id);
             sheet.show(getSupportFragmentManager(), BuildSettingsBottomSheet.TAG);
@@ -625,6 +662,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
 
     @Override
     public void onDestroy() {
+        AiBuildBridge.unregister(aiBuildRunner);
         super.onDestroy();
         unregisterReceiver(buildCancelReceiver);
         fProgress.exit();
@@ -1091,6 +1129,11 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         private final LinearProgressIndicator progressBar;
         public volatile boolean canceled;
         private volatile boolean isBuildFinished;
+        volatile AiBuildBridge.Listener aiListener;
+        volatile boolean aiSkipInstall;
+        private volatile boolean aiSuccess;
+        private volatile String aiMessage = "";
+        private boolean aiNotified;
         private boolean isShowingNotification = false;
         private FloatingProgressWindow fProgress;
 
@@ -1241,10 +1284,14 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 }
 
                 activity.runOnUiThread(() -> AnalyticsHelper.logExportProject(activity, "debug_apk", activity.sc_id, true));
-                activity.installBuiltApk();
+                if (!aiSkipInstall) {
+                    activity.installBuiltApk();
+                }
+                aiSuccess = true;
                 isBuildFinished = true;
             } catch (MissingFileException e) {
                 activity.runOnUiThread(() -> AnalyticsHelper.logExportProject(activity, "debug_apk", activity.sc_id, false));
+                aiMessage = (e.isMissingDirectory() ? "Required folder is missing: " : "Required file is missing: ") + e.getMissingFile().getAbsolutePath();
                 isBuildFinished = true;
                 activity.runOnUiThread(() -> {
                     boolean isMissingDirectory = e.isMissingDirectory();
@@ -1272,15 +1319,45 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 });
             } catch (zy zy) {
                 activity.runOnUiThread(() -> AnalyticsHelper.logExportProject(activity, "debug_apk", activity.sc_id, false));
+                aiMessage = String.valueOf(zy.getMessage());
                 isBuildFinished = true;
                 activity.indicateCompileErrorOccurred(zy.getMessage());
             } catch (Throwable tr) {
                 activity.runOnUiThread(() -> AnalyticsHelper.logExportProject(activity, "debug_apk", activity.sc_id, false));
                 isBuildFinished = true;
                 LogUtil.e("DesignActivity$BuildTask", "Failed to build project", tr);
+                aiMessage = Log.getStackTraceString(tr);
                 activity.indicateCompileErrorOccurred(Log.getStackTraceString(tr));
             } finally {
                 activity.runOnUiThread(this::onPostExecute);
+                notifyAi();
+            }
+        }
+
+        /**
+         * Reports the result to the AI assistant if it asked for this build. Runs at most once.
+         */
+        private void notifyAi() {
+            AiBuildBridge.Listener listener = aiListener;
+            if (listener == null || aiNotified) return;
+            aiNotified = true;
+            try {
+                String message;
+                if (aiSuccess) {
+                    message = "APK built successfully.";
+                    DesignActivity apkActivity = getActivity();
+                    if (apkActivity != null && apkActivity.q != null && apkActivity.q.finalToInstallApkPath != null) {
+                        message += "\nAPK_PATH: " + apkActivity.q.finalToInstallApkPath;
+                    }
+                } else if (canceled) {
+                    message = "Build was cancelled before it finished (cancel pressed or the editor was closed).";
+                } else {
+                    message = aiMessage == null || aiMessage.isEmpty() ? "Build failed without an error message. Call get_build_log." : aiMessage;
+                    if (message.length() > 12000) message = message.substring(0, 12000) + "\n...[cut, see get_build_log]";
+                }
+                listener.onFinished(aiSuccess, message);
+            } catch (Throwable t) {
+                Log.e("DesignActivity$BuildTask", "Failed to notify AI listener", t);
             }
         }
 
